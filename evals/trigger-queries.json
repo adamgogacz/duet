@@ -1,0 +1,67 @@
+[
+  {
+    "query": "/goal Use the duet skill to review PR #117 with your independently started peer and write the report under the shared temporary root.",
+    "should_trigger": true,
+    "reason": "Persistent-goal peer collaboration is the required Duet operating mode."
+  },
+  {
+    "query": "Use Duet for this task. You are peer-a; peer-b is already running and the board is in the authorized workspace.",
+    "should_trigger": true,
+    "reason": "Explicit ongoing Duet collaboration without a particular invocation command."
+  },
+  {
+    "query": "Continue our Duet task after context compaction. I still have the connection; check what the peer is waiting for.",
+    "should_trigger": true,
+    "reason": "Same-conversation continuation through the retained connection."
+  },
+  {
+    "query": "Join the shared message-file board and negotiate who edits the parser while I run the other agent.",
+    "should_trigger": true,
+    "reason": "Peer work negotiation through the board."
+  },
+  {
+    "query": "Continue the shared goal: send your findings to the peer, then do independent work until the review arrives.",
+    "should_trigger": true,
+    "reason": "Asynchronous progress within an established Duet goal."
+  },
+  {
+    "query": "We are using Duet. Wait for agreement on the contract before changing its implementation.",
+    "should_trigger": true,
+    "reason": "A synchronous dependency inside ongoing collaboration."
+  },
+  {
+    "query": "Check the collaboration board for the answer and release your Duet wait if the evidence is sufficient.",
+    "should_trigger": true,
+    "reason": "Receive, assess and resume a peer dependency."
+  },
+  {
+    "query": "Ask another CLI agent for a one-off review and return its findings.",
+    "should_trigger": false,
+    "reason": "Bounded CLI delegation uses a different workflow."
+  },
+  {
+    "query": "Explain how Duet handles concurrent message writes.",
+    "should_trigger": false,
+    "reason": "Protocol discussion, not participation."
+  },
+  {
+    "query": "Revise the Duet protocol to support three peers.",
+    "should_trigger": false,
+    "reason": "Authoring the protocol, not joining a two-peer goal."
+  },
+  {
+    "query": "Create a new skill from this collaboration protocol.",
+    "should_trigger": false,
+    "reason": "Skill authoring has a separate activation boundary."
+  },
+  {
+    "query": "Find every .agent-space directory and tell me which project used both CLIs.",
+    "should_trigger": false,
+    "reason": "Read-only filesystem investigation."
+  },
+  {
+    "query": "Fix the parser and add a regression test. Work independently.",
+    "should_trigger": false,
+    "reason": "No ongoing peer collaboration requested."
+  }
+]

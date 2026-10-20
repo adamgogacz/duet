@@ -1,0 +1,18 @@
+# Local collaboration metadata, credentials, and output
+.duet.json
+.duet.jsonl
+.duet.lock
+
+# Python and developer tooling
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/

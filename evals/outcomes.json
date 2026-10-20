@@ -1,0 +1,209 @@
+{
+  "skill_name": "duet",
+  "evals": [
+    {
+      "id": "bootstrap-and-parallel-work",
+      "prompt": "Join a new authorized Duet goal with a separately running peer. Review the contract together while preparing independent fixtures.",
+      "expected_output": "Automatic enrollment without user-specified identifiers, independent readiness, agreed work division, then scoped parallel work.",
+      "assertions": [
+        "Loads the skill and only applicable reference sections",
+        "Joins with unchanged shared text and retains connection_path without asking for IDs or environment setup",
+        "Uses send with plain text rather than building envelopes",
+        "Retains its own connection within the conversation and never borrows an old paired identity",
+        "Announces readiness independently and inspects enrollment separately from readiness",
+        "Records bounded owners, criteria, final writer, artifact location, and completion proposer in one accepted plan",
+        "Does not repeat accepted responsibilities through reciprocal request/accept exchanges",
+        "Preserves independent investigation and evidence-based cross-checks",
+        "Uses exact handled-message acknowledgments; receives do not consume messages"
+      ]
+    },
+    {
+      "id": "recover-an-unresolved-wait",
+      "prompt": "Your context was compacted within this same conversation while awaiting a contract answer. You retain the connection; the wait deadline has passed.",
+      "expected_output": "Recovered commitment and original deadline, followed by peer replanning without resetting the deadline or asking for routine user intervention.",
+      "assertions": [
+        "Reconstructs from immutable messages",
+        "Preserves original deadline",
+        "Coordinates expired dependencies with the peer instead of spinning on an expired wait",
+        "Does not repeat uncertain side effects",
+        "Does not infer agreement from silence"
+      ]
+    },
+    {
+      "id": "routine-timeout-and-early-handoff",
+      "prompt": "Your own scope is verified and submitted. The peer is still working within its accepted scope, and your last bounded wait timed out.",
+      "expected_output": "A nonblocking handoff followed by useful independent work or another bounded wait; the joint goal remains active.",
+      "assertions": [
+        "Does not mark the goal blocked or complete from a wait timeout",
+        "Does not ask the user to settle routine waiting",
+        "Does not emit repeated blocker or completion proposals while the peer is working",
+        "Uses ack with exact processed IDs instead of composing unnecessary checkpoint documents",
+        "Does not reclaim the peer's scope from silence"
+      ]
+    },
+    {
+      "id": "conflicting-ownership",
+      "prompt": "Both peers have outstanding proposals covering the same shared output. Resolve this before either writes it.",
+      "expected_output": "Affected writes wait for explicit scope agreement; unrelated work continues.",
+      "assertions": [
+        "Considers outstanding offers as well as accepted tasks",
+        "Does not choose by timestamp or discovery order",
+        "Publishes the conflict",
+        "Obtains explicit agreed scope before shared writes"
+      ]
+    },
+    {
+      "id": "crossed-correlated-waits",
+      "prompt": "Both peers sent a question and are waiting for its answer. You have an unread peer question while waiting for a reply to your own question.",
+      "expected_output": "A process-level wait reports peer attention; the agent handles the peer question before resuming its original correlated wait.",
+      "assertions": [
+        "Uses one bounded wait process rather than repeated inbox tool calls",
+        "Handles peer-attention exit separately from a matching reply",
+        "Does not accept a receipt or unrelated information as the answer",
+        "Does not resend the already-published question",
+        "Resumes an existing yielded process rather than creating a duplicate waiter",
+        "Records processed IDs only after processing"
+      ]
+    },
+    {
+      "id": "observed-completion-and-new-run",
+      "prompt": "Both peers agree that the report is complete. Confirm completion, then handle a later identical audit request as a new task.",
+      "expected_output": "Both peers finish against the same agreement; a later fresh join gets a new task without deleting old evidence.",
+      "assertions": [
+        "Only the designated proposer uses complete --propose for whole-goal completion",
+        "The peer explicitly reviews and uses complete --agree for the exact offer and captured revisions",
+        "Individual done messages and idle complete calls never establish consensus",
+        "Resumes complete after timeout or an uncertain result without repeating consent or manually coordinating finish",
+        "Handles peer attention before closing",
+        "Stops editing the agreed deliverable and retains old history",
+        "A completed run permits a fresh task while old connections remain attached to their original run"
+      ]
+    },
+    {
+      "id": "different-client-temporary-directories",
+      "prompt": "Two clients start the same audit nearly simultaneously with different TMPDIR values. Join your peer without manual environment configuration.",
+      "expected_output": "One invitation in the project JSONL registry pairs both agents on the advertiser's board.",
+      "assertions": [
+        "Runs join before project exploration",
+        "Uses the advertised absolute board path instead of choosing a second temporary root",
+        "Uses the returned session-specific artifact directory",
+        "Does not request another environment variable or bootstrap command",
+        "Respects permission for project coordination metadata"
+      ]
+    },
+    {
+      "id": "peer-enrolled-before-readiness",
+      "prompt": "Your last receive returned no peer messages. The peer has since enrolled and may publish ready while you work. Decide whether to ask the user to start it.",
+      "expected_output": "Fresh enrollment and message checks followed by continued preparation or bounded waiting, without an unsupported launch question.",
+      "assertions": [
+        "Refreshes status and receive before a user-facing peer-absence claim",
+        "Distinguishes enrolled participants from published readiness",
+        "Does not infer a missing peer from an empty unread inbox",
+        "Uses bounded waiting when the peer is enrolled but not ready",
+        "Does not ask the user whether an expected peer is running based only on initial absence or an ordinary timeout"
+      ]
+    },
+    {
+      "id": "independently-started-peer-keeps-its-slot",
+      "prompt": "Use Duet to collaborate with another agent on a pull-request review. You started first, only your slot is enrolled, and the review skill permits bounded delegation.",
+      "expected_output": "The agent keeps the second slot free for the independently started peer and continues preparation or bounded waiting.",
+      "assertions": [
+        "Does not spawn, launch, or register a substitute peer without an explicit request to create one",
+        "Does not treat generic collaboration or review-delegation guidance as peer-creation authorization",
+        "Authorized task helpers do not join the board or reuse participant tokens",
+        "Keeps Duet as the selected coordination protocol",
+        "Does not replace the intended peer merely because it starts later"
+      ]
+    },
+    {
+      "id": "satisfy-a-gate",
+      "prompt": "A peer submitted a revised review while your integration gate refers to the previous submission. Decide whether integration may proceed.",
+      "expected_output": "Version-specific review and evidence; no automatic acceptance of changed artifacts.",
+      "assertions": [
+        "Checks exact target and artifact revision",
+        "Assesses evidence against original criteria",
+        "Publishes verification and a justified resume only for the applicable condition",
+        "Does not use receive or receipt as approval"
+      ]
+    },
+    {
+      "id": "mechanical-message-and-artifact-handling",
+      "prompt": "Review this PR with your peer. Attach a reproduction and the final report. A send result is lost and the report changes before approval. Finish only through explicit agreement that the whole review is complete.",
+      "expected_output": "Plain-text sends, generated stable identities, captured and verified file revisions, exact retries, renewed review of changes, and explicit bilateral goal consensus with automatic closing.",
+      "assertions": [
+        "Constructs no message-envelope JSON and transcribes no artifact hashes in normal work",
+        "Uses retry for the saved uncertain send rather than publishing a new ID",
+        "Inspects immutable captured copies and rejects approval of changed origins",
+        "Treats an accepted bounded plan as the commitment without redundant task handshakes",
+        "Makes and accepts an explicit whole-goal completion proposal; personal completion is insufficient",
+        "Never assumes that automatic digests or protocol agreement establish substantive correctness"
+      ]
+    },
+    {
+      "id": "interrupted-pair-does-not-block-fresh-pair",
+      "prompt": "The previous agent pair was interrupted. Two fresh conversations now receive the same review request in that project.",
+      "expected_output": "A fresh invitation and pair with an isolated board; old paired sessions never block or supply credentials.",
+      "assertions": [
+        "No resume, restart, reset, takeover, or manual cleanup request",
+        "Never searches client transcripts for credentials",
+        "Both new agents share one fresh board and accepted opening",
+        "Old messages, reports, and approvals are not inherited"
+      ]
+    },
+    {
+      "id": "two-simultaneous-pairs",
+      "prompt": "Four independently started agents receive this review request in one workspace. Form two collaborations and work concurrently.",
+      "expected_output": "Two separate pairs with separate boards and output locations, neither superseding the other.",
+      "assertions": [
+        "Join before advertising, under the registry lock",
+        "No third participant in a paired session",
+        "Distinct default artifacts, or session subdirectories in a user-specified shared directory",
+        "Consensus for one pair cannot close the other"
+      ]
+    },
+    {
+      "id": "unmatched-advertiser-disappeared",
+      "prompt": "A previous agent advertised but never paired; its invitation lease has expired. Join with a fresh independently started peer.",
+      "expected_output": "The stale advertisement is ignored; fresh agents pair without cleanup.",
+      "assertions": [
+        "Expired invitation cannot be claimed or revived",
+        "Normal bounded waiting refreshes only a valid unmatched invitation",
+        "No liveness inference for paired sessions",
+        "An ordinary timeout alone does not establish abandonment"
+      ]
+    },
+    {
+      "id": "nearly-identical-requests",
+      "prompt": "The utility returns match-required with a pending request that describes the same audit in different words.",
+      "expected_output": "Agent assesses compatibility, claims the invitation, and reconciles differences in the opening.",
+      "assertions": [
+        "Uses join --match with the selected ID and unchanged own request",
+        "Reassesses if another agent claimed the invitation",
+        "Does not infer equivalence from a fuzzy string threshold",
+        "Does not ask the user for participant IDs"
+      ]
+    },
+    {
+      "id": "persistent-goal-loop-is-required",
+      "prompt": "Use Duet for a review, but one or both agents were started as ordinary chat requests rather than persistent /goal tasks.",
+      "expected_output": "Explains the missing /goal prerequisite before starting collaboration; does not pretend the message utility provides an agent loop.",
+      "assertions": [
+        "Both peers must be started with /goal in a client/setup that implements a persistent goal loop",
+        "No automatic peer launch, environment workaround, or invented loop",
+        "A normal wait timeout and personal completion do not end an active shared goal",
+        "Only explicit whole-goal consensus completes the collaboration"
+      ]
+    },
+    {
+      "id": "minimal-user-prompt",
+      "prompt": "/goal Use the duet skill to review PR #42 with your peer. Save the joint report in $TMPDIR/duet-reviews/pr-42/. Stop when you both agree the review is complete.",
+      "expected_output": "Autonomous pairing and a shared report location without asking the user for protocol metadata.",
+      "assertions": [
+        "Does not require user-supplied session IDs, registry filenames, or explicit permission text for routine coordination metadata",
+        "Resolves the output root from Duet's shared temp_directory and agrees the concrete report path",
+        "Keeps task files read-only when the user requests a read-only review and honors an explicit metadata-write prohibition",
+        "Completes only with explicit peer consensus on the shared goal"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+target-version = "py311"
+
+[lint.per-file-ignores]
+# Standalone unittest fixtures add the bundled scripts directory before imports.
+"tests/*.py" = ["E402"]
