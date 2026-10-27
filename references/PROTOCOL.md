@@ -10,7 +10,8 @@ recommended, and optional behavior.
 
 ## 1. Pairing and startup
 
-Users provide task content, an optional output location, and completion criteria.
+Users provide task content and optional output/completion criteria. Peers derive
+faithful bounded completion criteria when the user supplies only a higher-level goal.
 Participants handle generated IDs, registry files, and shared-path resolution.
 Invoking Duet permits its coordination metadata unless the user explicitly forbids
 those writes; a read-only task keeps task content read-only. For shared output paths,
@@ -72,15 +73,36 @@ isolate project-file edits.
 Both participants MUST independently publish ready with the same context revision.
 Enrollment and readiness are different facts; an empty inbox or normal wait
 timeout does not establish a failed peer launch. Joint work acts require both
-readiness messages. Investigation MAY proceed while the opening is negotiated.
+readiness messages. Before an accepted gate, only instructions, pairing, readiness,
+and negotiation are permitted. Task metadata/diff inspection, research, substantive
+ideation, experiments, and edits MUST wait. Native tools remain outside the
+utility's enforcement boundary.
+Instruction reads mean skill/rules and user directives. Referenced task code,
+documents, designs, and evidence MUST NOT be read before gate agreement, even
+to prepare the plan. Load the skill before requesting those files.
+A failed or denied coordination command MUST NOT waive this restriction or
+authorize a solo task report. Diagnose the specific operation without evading
+permissions. If coordination remains unavailable, report startup status to the
+user without substantive analysis or task artifacts. Premature work MUST be
+disclosed to the peer and assessed under the user's constraints; subsequent
+agreement MUST NOT be represented as preceding that work or satisfying an unmet
+user condition. Material deviations remain part of the outcome's limitations.
 Peer-a proposes the initial-plan decision for that context revision, with exactly
 the work-division scope and both readiness messages in its causal ancestry. The
 peer agrees or counterproposes. Counterplans cite the opening and retain its scope.
 
-The opening MUST record bounded owners/scopes, criteria, artifact location, final
-writer, and completion proposer. Its acceptance establishes those commitments;
+The opening MUST carry nonempty completion `criteria` and a `stop_condition`,
+and record scope, owners, user constraints, collaboration method, artifact location,
+final writer, and completion proposer. Criteria must describe a meaningful outcome
+and acceptance evidence; the stop condition bounds unsuccessful investigation or
+reassessment. A success condition alone does not guarantee termination on an
+impossible task. Peers preserve explicit user conditions and must not silently
+replace the requested outcome with an easier deliverable. Material ambiguity about
+scope or user-reserved authority requires user input. Its acceptance establishes those commitments;
 participants MUST NOT repeat the same responsibilities through reciprocal task
-requests. New or changed commitments require new agreement. Only user-reserved
+requests. New or changed commitments require new agreement. Gate amendments include full
+replacement criteria and a stop condition. Competing accepted amendments require
+explicit causal reconciliation, never arrival-order selection. Only user-reserved
 choices or missing external prerequisites warrant user intervention; ordinary
 partitioning, feedback, and waiting are peer responsibilities.
 
@@ -103,7 +125,10 @@ regular files, compute digests, and identify immutable copies. Approval applies
 to its exact target revision. A changed working origin before approval requires
 fresh submission and review. After consensus, the captured revision is the approved
 result. Agreement and matching digests do not establish substantive correctness;
-independent investigation and evidence-based challenge remain required.
+independent investigation and evidence-based challenge remain required. Participants
+MUST distinguish a claim contradicted by evidence from a claim that lacks support.
+A counterexample refutes only the proposition it actually contradicts; do not
+extend it into unsupported claims about adjacent assumptions or environments.
 
 ## 3. Publication and causal history
 
@@ -122,7 +147,8 @@ or cycles invalidate its dependent transitions. Neither may authorize work.
 Helpers SHOULD journal generated IDs/envelopes before publication and retain them
 until delivery uncertainty is reconciled. Retrying MUST reuse exact bytes/ID.
 Receiving does not acknowledge or consume. Acknowledgment records only messages
-actually handled. A substantive reply MAY automatically acknowledge its target after publication.
+actually handled. Routine sends SHOULD return compact receipts; full envelopes are for diagnosis.
+A substantive linked reply MAY automatically acknowledge its target after publication.
 Interrupted acknowledgment MUST be retried idempotently; unrelated arrivals remain
 unread.
 
@@ -193,10 +219,18 @@ An initiating act has `reply_to: null`. Responses MUST name the target and its
 subject. Only the recipient of an `ask` may answer it; the asker decides whether
 the answer is adequate. A further question gets a new ID. A correction to an
 answer is communicated explicitly and requires reassessment of affected work.
+Answers, including corrections and answers crossing a question withdrawal, are
+information rather than competing commitments; they do not create a control conflict.
 
 An `inform` or `receipt` may refer to any valid message. Receipts are optional
 unless requested by the goal. Receipts MUST NOT be acknowledged with further
 receipts. Duplicate requests MUST NOT create duplicate commitments.
+
+A work-division proposal additionally requires `criteria` (nonempty text array)
+and `stop_condition` (nonempty text). A goal-completion proposal additionally
+requires `gate` (effective agreement ID), `evidence` (one statement per criterion,
+in order), `effects` (utility-computed reported-effect context digest), and `outcome`
+(`complete` or `incomplete`). These fields do not prove semantic correctness.
 
 ### Commitments and decisions
 
@@ -207,7 +241,10 @@ completed or uncertain effects. The requester cannot withdraw an already accepte
 request to revoke active work. Reassignment requires a new accepted request.
 
 Task terms are immutable: changed scope, inputs, criteria, or owner require a new
-task identity. Only one submission may await review per task. Verification accepts
+task identity. Legitimate release/cancellation ends ownership without satisfying
+an associated mandatory user criterion. The owner may abandon a submitted branch
+by release causally citing that branch; concurrent submit/release alternatives
+remain conflicting. A requester cannot withdraw an already accepted task. Only one submission may await review per task. Verification accepts
 only its target submission and exact revisions. Acceptance authorizes ordinary
 subtasks/checks inside scope without repeated approvals. The peer still evaluates
 checks, consequences, and uncertainties instead of merely agreeing.
@@ -218,6 +255,19 @@ agreement citing the old one. Conflicting control replies, such as accept/declin
 or verify/reject of one target, block affected work. Participants MUST expose the
 conflict and agree replacement terms referencing all relevant evidence. Arrival
 order MUST NOT select a winner, and explanatory text cannot erase history.
+
+Use an ordinary `propose` with scope `["conflict-resolution"]`, full replacement
+terms, and every conflicting reply ID directly in `causes`; its peer must `agree`.
+An accepted work-division replacement may also reconcile conflicts it explicitly
+cites this way. This retires the covered conflict blocker, not its immutable history
+or its old tasks. Accepted commitments still need valid verification or owner release;
+ambiguous submission/verification branches must be abandoned by owner release and,
+if needed, replaced by a new accepted request. No old conflicting approval is revived.
+New conflicting replies require fresh reconciliation. Competing accepted replacements
+remain unresolved until a new bilateral proposal cites the original replies and all
+competing replacement agreements. A reconciliation whose own responses conflict is
+never treated as consent. `status` distinguishes active blockers from recorded
+`reconciled_conflicts`; raw receive history retains both resolved and unresolved conflicts.
 
 ## 6. Dependencies and waiting
 
@@ -262,7 +312,12 @@ Immutable messages and captured artifacts are the collaboration record. A
 participant's conversation context is a cache. Its checkpoint records goal,
 participant, execution credential, handled peer message IDs, all own outgoing IDs,
 deferred and invalid records with reasons, active commitments, and planned/running/
-uncertain/resolved external actions. Only that participant writes it atomically.
+uncertain/resolved external actions. Only that participant writes it atomically. Recorded running/uncertain effects
+and invalid caches block successful completion. A snapshot of reported effects is
+bound to the final offer, so changed effect records require reassessment. A missing
+cache is not evidence that no external action occurred. Journal consequential
+changes and reconcile the external system under user authority; the utility does
+not provide an authoritative external-operation log.
 
 After context loss within the same conversation, retain the connection, replay
 messages and exact artifact revisions, reconcile the checkpoint, and continue
@@ -290,36 +345,63 @@ latency. Check pairing/readiness before making a peer-absence claim.
 1. Two agents pair and independently send ready.
 2. Peer-a proposes owners, scope, criteria, artifact paths, final writer, and
    completion proposer. Peer-b agrees or counterproposes.
-3. Both investigate, exchange findings with evidence and uncertainty, and challenge
-   consequential claims. The accepted plan requires no redundant task handshakes.
+3. Only after gate agreement, both investigate or ideate using the chosen method,
+   exchange evidence and uncertainty, and challenge consequential claims. The accepted plan requires no redundant task handshakes.
 4. One assembles the report and the other reviews captured revisions. Corrections
    receive evidence-based review.
 5. The designated proposer makes the whole-goal completion claim at exact captured
    revisions. The peer explicitly agrees or objects.
 6. Both observe the same agreement through automatic closing and stop.
 
-## 11. Whole-goal consensus
+## 11. Whole-goal consensus and bounded stopping
 
 Personal completion and two independent done messages do not establish consensus.
-After coverage, checks, peer reviews, and limitations are settled, only peer-a
-proposes the decision with exactly the goal-completion scope. Its proposal MUST
-state that the whole shared goal is complete and identify the final revisions,
-checks, limitations, and any recorded disagreements. Peer-b must review and
-explicitly agree to that exact claim, or object with reasons.
+The designated proposer offers a whole-goal claim under the effective gate, with
+one evidence statement per criterion and exact final artifact revisions. The peer
+reviews and explicitly agrees or requests changes. No user criterion is waived
+by labeling missing verification a limitation. An uncertainty assessment may
+legitimately conclude “unresolved”; a required proof or implementation may not.
 
-There is one unsettled completion offer. A withdrawn or objected offer cannot be
-accepted. A changed report before agreement needs withdrawal and a new reviewed
-offer. After agreement, a courtesy withdrawal or competing completion offer is
-invalid. Both participants MUST close against the same agreement. Serialized
-control operations prevent an acceptance/withdrawal race from committing both.
+Successful completion requires legitimate dispositions for recognized commitments,
+released or withdrawn completion-blocking waits, and no unresolved journal errors,
+conflicts, or reported running/uncertain effects. Acknowledgment is a processing
+cursor, not a task disposition. The utility checks recorded structure; peers judge
+the gate's adequacy, evidence quality, and satisfaction of user intent.
 
-A helper MAY carry out each participant's closing acknowledgment automatically.
-It MUST NOT manufacture consent from a wait, an idle completion call, or a personal
-done statement. Unhandled peer information requires assessment before approval or
-closing; if consent was not yet recorded, an explicit agreement is still needed.
-Repeated completion calls continue mechanical closing without repeating consent.
+The offer binds the current gate agreement, reported effects, and causal journal
+basis. Acceptance and every finish recheck that binding. Every new nonreceipt/
+nonclosing message conservatively stales an offer; the utility cannot decide
+semantic materiality. Changed report origins or gate/effect context also require
+fresh assent. Acknowledging such information never restores old consent. During
+closing avoid routine progress chatter; use checkpoint acknowledgments and an
+attention-bearing correction request for consequential information.
 
-After both participants observe the agreement, stop editing the approved output.
-The captured revision remains authoritative; changed working files are not silently
-approved. History is preserved. Session completion has no effect on discovering
-or completing other collaboration sessions.
+One pending usable offer is permitted. The proposer may mechanically withdraw a
+pending offer or alert that an approved claim is being reassessed, then issue a
+fresh one. An objection already settles the offer and needs no extra withdrawal.
+Old approvals remain historical; they do not approve revised bytes or criteria.
+Unchanged report bytes may be reused under a fresh reviewed offer.
+
+Both finish acknowledgments remain provisional. Until global termination both
+actors can assess and respond to late information. A fresh agreement resets old
+closing acknowledgments. Publication and terminal closing share one session lock;
+final validation and commit occur under it. After the serialized terminal cutoff,
+new messages fail and exact historical delivery replays remain idempotent. A
+suspended older waiter must return the actual terminal agreement and its artifacts,
+never mix a new agreement with an old report revision. The cutoff orders protocol
+events, not unrecorded native activity or facts discovered off-board afterward.
+
+When a gate cannot be met within its bounds, peers may explicitly agree an
+`incomplete` outcome, with evidence explaining unmet conditions. This ends the
+collaboration without claiming the user's goal succeeded. It does not require
+pretending unfinished work was verified. A known unavailable peer cannot supply
+bilateral consent: report local incomplete work and seek a user decision without
+inventing approval or silently assuming an identity. Ordinary silence or timeouts
+alone do not establish peer loss. No gate promises eventual success or peer return.
+
+After successful joint completion, stop editing the approved output. Its captured
+revision remains authoritative independently of later origin edits or processing
+cache loss. Changed source inputs or native effects require honest new assessment;
+protocol agreement is never a proof of substantive correctness. Deliver findings,
+reasoning, evidence, and relevant limits; retain detailed process history on the
+board unless the user requests it. Completion of one session does not affect others.

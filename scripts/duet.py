@@ -13,7 +13,7 @@ from pathlib import Path
 
 from actions import Connection, retry, send
 from board import publish, read_record, save_checkpoint
-from completion import complete
+from completion import complete, state
 from configure import configure
 from delivery import acknowledge, receive, wait_for_messages
 from enrollment import check_membership, finish, join, session_status
@@ -35,7 +35,12 @@ def parser() -> argparse.ArgumentParser:
     status = commands.add_parser(
         "status", help="Inspect project invitations without inferring agent liveness"
     )
-    status.add_argument("--workspace", type=Path, required=True)
+    status_target = status.add_mutually_exclusive_group(required=True)
+    status_target.add_argument("--workspace", type=Path)
+    status_target.add_argument(
+        "--connection",
+        help="Inspect this actor's recognized gate, obligations, and valid next actions",
+    )
     setup = commands.add_parser(
         "setup", help="Create or reuse task settings under TMPDIR"
     )
@@ -70,7 +75,7 @@ def parser() -> argparse.ArgumentParser:
         "send",
         help="Construct and journal a message from plain text and file attachments",
     )
-    sending.add_argument("--connection", type=Path, required=True)
+    sending.add_argument("--connection", required=True)
     sending.add_argument(
         "--kind", choices=[kind.value for kind in Kind], default=Kind.INFORM.value
     )
@@ -81,6 +86,10 @@ def parser() -> argparse.ArgumentParser:
     sending.add_argument("--scope", nargs="+")
     sending.add_argument("--criteria", action="append")
     sending.add_argument("--evidence", action="append")
+    sending.add_argument(
+        "--stop-condition",
+        help="Bounded unsuccessful-stop/reassessment rule for a gate",
+    )
     sending.add_argument("--artifact", action="append", type=Path, default=[])
     sending.add_argument(
         "--body",
@@ -89,18 +98,34 @@ def parser() -> argparse.ArgumentParser:
     )
     sending.add_argument("--cause", action="append", default=[])
     sending.add_argument("--dry-run", action="store_true")
+    sending.add_argument(
+        "--details",
+        action="store_true",
+        help="Include the constructed envelope instead of a compact delivery receipt",
+    )
     retrying = commands.add_parser(
         "retry", help="Retry the exact last saved send with its original generated ID"
     )
-    retrying.add_argument("--connection", type=Path, required=True)
+    retrying.add_argument("--connection", required=True)
     retrying.add_argument("--dry-run", action="store_true")
+    retrying.add_argument("--details", action="store_true")
     closing = commands.add_parser(
         "complete",
         help="Propose or explicitly agree to joint completion; handle closing automatically",
     )
-    closing.add_argument("--connection", type=Path, required=True)
+    closing.add_argument("--connection", required=True)
     choice = closing.add_mutually_exclusive_group()
     choice.add_argument("--propose", action="store_true")
+    choice.add_argument(
+        "--revise",
+        action="store_true",
+        help="Prepare a fresh completion offer without manual withdrawal choreography",
+    )
+    choice.add_argument(
+        "--request-changes",
+        metavar="PROPOSAL_ID",
+        help="Send an attention-bearing correction or late-evidence alert",
+    )
     choice.add_argument(
         "--agree",
         metavar="PROPOSAL_ID",
@@ -110,6 +135,14 @@ def parser() -> argparse.ArgumentParser:
         "--text", help="Completion evidence or agreement comment; - reads stdin"
     )
     closing.add_argument("--artifact", action="append", type=Path, default=[])
+    closing.add_argument(
+        "--evidence",
+        action="append",
+        help="One statement per gate criterion, in the same order",
+    )
+    closing.add_argument(
+        "--outcome", choices=["complete", "incomplete"], default="complete"
+    )
     closing.add_argument("--timeout-seconds", type=float)
     closing.add_argument("--dry-run", action="store_true")
     for name, description in (
@@ -143,7 +176,6 @@ def parser() -> argparse.ArgumentParser:
         )
         identity.add_argument(
             "--connection",
-            type=Path,
             help="Saved join handle supplying task and identity",
         )
         if name != "validate":
@@ -223,6 +255,7 @@ def main() -> int:
                         reply_to=arguments.reply_to,
                         scope=arguments.scope,
                         criteria=arguments.criteria,
+                        stop_condition=arguments.stop_condition,
                         evidence=arguments.evidence,
                         artifacts=arguments.artifact,
                         subject_type=arguments.subject_type,
@@ -236,16 +269,37 @@ def main() -> int:
                     output, code = complete(
                         connection,
                         propose=arguments.propose,
+                        revise=arguments.revise,
+                        request_changes=arguments.request_changes,
+                        evidence=arguments.evidence,
+                        outcome=arguments.outcome,
                         agree=arguments.agree,
                         text=text,
                         artifacts=arguments.artifact,
                         timeout=arguments.timeout_seconds,
                         dry_run=arguments.dry_run,
                     )
+            if (
+                arguments.command in {"send", "retry"}
+                and not arguments.details
+                and "message" in output
+            ):
+                message = output["message"]
+                output = {
+                    **{key: value for key, value in output.items() if key != "message"},
+                    "id": message["id"],
+                    "kind": message["kind"],
+                    "artifacts": message["body"].get("artifacts", []),
+                }
             print(json.dumps(output, sort_keys=True, allow_nan=False))
             return code
         if arguments.command == "status":
-            print(json.dumps(session_status(arguments.workspace), sort_keys=True))
+            output = (
+                state(Connection.load(arguments.connection))
+                if arguments.connection
+                else session_status(arguments.workspace)
+            )
+            print(json.dumps(output, sort_keys=True))
             return ExitCode.OK
         if arguments.command == "join":
             limit = Settings.default("max_message_bytes")
@@ -279,6 +333,14 @@ def main() -> int:
                     output["session"],
                 )
                 output["connection_path"] = str(connection.save())
+                try:
+                    output["connection"] = connection.save_alias()
+                except (DuetError, OSError):
+                    # Failure of optional shorthand must not strand an enrolled actor.
+                    output["connection"] = output["connection_path"]
+                    output["connection_notice"] = (
+                        "short handle unavailable; retain the full connection path"
+                    )
             print(
                 json.dumps(output, ensure_ascii=True, sort_keys=True, allow_nan=False)
             )

@@ -25,6 +25,12 @@ def ancestry(causes: tuple[str, ...], history: Mapping[str, Message]) -> set[str
     return found
 
 
+def causal_frontier(history: Mapping[str, Message]) -> set[str]:
+    """Pin all history through its maximal events, preserving independent branches."""
+    covered = {key for message in history.values() for key in message.causes}
+    return set(history) - covered
+
+
 @dataclass(frozen=True)
 class Opening:
     """Structural startup facts; plan content still requires participant review."""

@@ -21,11 +21,11 @@ from artifacts import capture, verify
 from board import atomic_write, publish, scan
 from completion import complete
 from delivery import acknowledge, receive
-from enrollment import join, find_run
+from enrollment import find_run, join
 from messages import Kind
 from settings import DuetError, ExitCode
-from test_duet import BoardFixture
 from test_delivery import FakeClock
+from test_duet import BoardFixture
 
 
 class InteractionFixture(BoardFixture):
@@ -62,6 +62,15 @@ class InteractionFixture(BoardFixture):
             ],
         }
 
+    def handled(self, index: int) -> None:
+        """Record processing only where a fixture has explicitly assessed the messages."""
+        peer = self.peers[index]
+        messages = [
+            message.id for message in receive(peer.settings, peer.participant).unread
+        ]
+        if messages:
+            acknowledge(peer.settings, peer.participant, peer.session, messages)
+
     def plan(self) -> dict:
         """One accepted plan establishes both peers' bounded review responsibilities."""
         for peer in self.peers:
@@ -70,6 +79,8 @@ class InteractionFixture(BoardFixture):
             self.peers[0],
             Kind.PROPOSE,
             scope=["work-division"],
+            criteria=["Produce the agreed evidence-based result"],
+            stop_condition="Stop incomplete if the bounded checks cannot establish the required evidence",
             text="A reviews API, B reviews storage; both cross-check. A writes the shared report; A proposes joint completion. Cover the requested PR and record limitations.",
         )
         return send(self.peers[1], Kind.AGREE, reply_to=proposal["id"])
@@ -107,12 +118,16 @@ class ActionTests(InteractionFixture):
             self.peers[0],
             Kind.PROPOSE,
             scope=["work-division"],
+            criteria=["Produce the agreed evidence-based result"],
+            stop_condition="Stop incomplete if the bounded checks cannot establish the required evidence",
             text="A covers API, B covers storage",
         )
         counter = send(
             self.peers[1],
             Kind.PROPOSE,
             scope=["work-division"],
+            criteria=["Produce the agreed evidence-based result"],
+            stop_condition="Stop incomplete if the bounded checks cannot establish the required evidence",
             text="B covers API, A covers storage; otherwise keep the same criteria and artifact",
         )
         self.assertIn(first["id"], counter["message"]["causes"])
@@ -177,6 +192,7 @@ class ActionTests(InteractionFixture):
     def test_immutable_capture_survives_origin_edit_and_detects_stale_approval(
         self,
     ) -> None:
+        self.plan()
         result = send(
             self.peers[0], text="Review the attached evidence", artifacts=[self.report]
         )
@@ -235,6 +251,7 @@ class ActionTests(InteractionFixture):
         )
 
     def test_dry_run_has_no_outbox_or_artifact_side_effects(self) -> None:
+        self.plan()
         before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         result = send(
             self.peers[0], text="Preview only", artifacts=[self.report], dry_run=True
@@ -391,6 +408,11 @@ class ConsensusTests(InteractionFixture):
         self, connection: Connection, **options: object
     ) -> tuple[dict, ExitCode]:
         """Test consensus deterministically; separate subprocess cases use real clocks."""
+        if options.get("propose") or options.get("revise"):
+            options.setdefault(
+                "evidence",
+                ["Fixture checks and cross-review satisfy the agreed criterion"],
+            )
         return complete(connection, clock=FakeClock(), **options)
 
     def test_individual_done_messages_do_not_complete_the_goal(self) -> None:
@@ -398,8 +420,8 @@ class ConsensusTests(InteractionFixture):
         for peer in self.peers:
             send(peer, text="My own part is done")
         self.assertEqual(self.session_status()["state"], "unfinished")
-        with self.assertRaisesRegex(DuetError, "completion offer"):
-            self.completion(self.peers[1])
+        result, _ = self.completion(self.peers[1])
+        self.assertEqual(result["status"], "working")
 
     def test_objection_blocks_closure_until_a_revised_offer_is_explicitly_accepted(
         self,
@@ -492,6 +514,7 @@ class ConsensusTests(InteractionFixture):
             text="Whole goal complete at the revised report",
             artifacts=[self.report],
         )
+        self.handled(1)
         self.completion(self.peers[1], agree=revised["proposal"])
         self.assertEqual(self.completion(self.peers[0])[0]["status"], "complete")
 
@@ -512,6 +535,17 @@ class ConsensusTests(InteractionFixture):
         acknowledge(
             self.peers[0].settings, "peer-a", self.peers[0].session, [late["id"]]
         )
+        self.assertEqual(
+            self.completion(self.peers[0])[0]["status"], "revision-required"
+        )
+        revised, _ = self.completion(
+            self.peers[0],
+            revise=True,
+            text="Whole goal reassessed after the new context",
+            artifacts=[self.report],
+        )
+        self.handled(1)
+        self.completion(self.peers[1], agree=revised["proposal"])
         self.assertEqual(self.completion(self.peers[0])[0]["status"], "complete")
 
     def test_new_peer_information_is_handled_before_recording_consensus(self) -> None:
@@ -546,6 +580,8 @@ class ConsensusTests(InteractionFixture):
             "The shared goal and report are complete",
             "--artifact",
             str(self.report),
+            "--evidence",
+            "Fixture checks satisfy the gate",
             "--timeout-seconds",
             "0.02",
         )

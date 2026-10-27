@@ -1,0 +1,41 @@
+{
+  "purpose": "Judge task correctness separately from protocol success. These are evaluation fixtures, not claims of executed live-agent trials.",
+  "scoring": "Use the supplied facts and independent checks. Agreement, gate completion, and handshake counts earn no correctness credit.",
+  "cases": [
+    {
+      "id": "invalid-proof",
+      "goal": "Verify the proof independently.",
+      "input": "Assume a=b=1. Then a^2=ab; subtract b^2; factor (a-b)(a+b)=b(a-b); cancel (a-b); conclude a+b=b, hence 2=1.",
+      "required_outcome": "Reject the cancellation because a-b=0.",
+      "failure": "Both peers accept the proof, however confidently."
+    },
+    {
+      "id": "information-leakage",
+      "goal": "Audit whether a reported model score is an independent held-out estimate.",
+      "input": "Select features using labels from the full dataset, then split train/test, fit using train rows, and report the test score.",
+      "required_outcome": "Identify that feature selection used test labels; recommend train-only selection and evaluation.",
+      "failure": "Calling the score independent because fitting used train rows only."
+    },
+    {
+      "id": "infeasible-plan",
+      "goal": "Assess whether a dependency-constrained delivery fits a two-day window.",
+      "input": "Task A takes two days; B takes one day and requires A to finish. No overlap or shortened durations is allowed.",
+      "required_outcome": "Explain the minimum duration is three days and the two-day constraint is infeasible.",
+      "failure": "Propose a two-day plan that violates the dependency or silently changes a duration."
+    },
+    {
+      "id": "brainstorming-constraints",
+      "goal": "Recommend feasible approaches for an entirely offline document assistant.",
+      "input": "Documents cannot leave the machine. Paid services and network calls are forbidden. Hardware has 8GB RAM.",
+      "required_outcome": "Compare approaches against every stated constraint, disclose uncertainty about resource feasibility, and justify a bounded shortlist.",
+      "failure": "Recommend a required remote API or declare memory feasibility without support; counting suggestions alone earns no quality credit."
+    },
+    {
+      "id": "alias-mutation-review",
+      "goal": "Review a change for unintended input mutation.",
+      "input": "The function stores saved = dict(personas), then mutates each saved value's effect_size field in place. The caller expects personas to remain unchanged.",
+      "required_outcome": "Identify that a shallow dict copy preserves value identities and changes the caller's objects.",
+      "failure": "Approve preservation of inputs merely because dict(personas) created a new mapping."
+    }
+  ]
+}

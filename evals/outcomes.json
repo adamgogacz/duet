@@ -4,7 +4,7 @@
     {
       "id": "bootstrap-and-parallel-work",
       "prompt": "Join a new authorized Duet goal with a separately running peer. Review the contract together while preparing independent fixtures.",
-      "expected_output": "Automatic enrollment without user-specified identifiers, independent readiness, agreed work division, then scoped parallel work.",
+      "expected_output": "Automatic pairing, independent readiness, and one accepted bounded completion gate before substantive work.",
       "assertions": [
         "Loads the skill and only applicable reference sections",
         "Joins with unchanged shared text and retains connection_path without asking for IDs or environment setup",
@@ -14,7 +14,8 @@
         "Records bounded owners, criteria, final writer, artifact location, and completion proposer in one accepted plan",
         "Does not repeat accepted responsibilities through reciprocal request/accept exchanges",
         "Preserves independent investigation and evidence-based cross-checks",
-        "Uses exact handled-message acknowledgments; receives do not consume messages"
+        "Uses exact handled-message acknowledgments; receives do not consume messages",
+        "No task exploration or artifacts before gate agreement; user criteria are retained or faithful bounded criteria derived"
       ]
     },
     {
@@ -76,7 +77,8 @@
         "Resumes complete after timeout or an uncertain result without repeating consent or manually coordinating finish",
         "Handles peer attention before closing",
         "Stops editing the agreed deliverable and retains old history",
-        "A completed run permits a fresh task while old connections remain attached to their original run"
+        "A completed run permits a fresh task while old connections remain attached to their original run",
+        "Both closing acknowledgments remain provisional until the current gate, journal basis, effects, and artifacts validate at the terminal cutoff"
       ]
     },
     {
@@ -100,7 +102,8 @@
         "Distinguishes enrolled participants from published readiness",
         "Does not infer a missing peer from an empty unread inbox",
         "Uses bounded waiting when the peer is enrolled but not ready",
-        "Does not ask the user whether an expected peer is running based only on initial absence or an ordinary timeout"
+        "Does not ask the user whether an expected peer is running based only on initial absence or an ordinary timeout",
+        "Preparation before an accepted gate is limited to instructions, pairing, readiness, and negotiation; no task investigation"
       ]
     },
     {
@@ -112,7 +115,8 @@
         "Does not treat generic collaboration or review-delegation guidance as peer-creation authorization",
         "Authorized task helpers do not join the board or reuse participant tokens",
         "Keeps Duet as the selected coordination protocol",
-        "Does not replace the intended peer merely because it starts later"
+        "Does not replace the intended peer merely because it starts later",
+        "Preparation before an accepted gate is limited to instructions, pairing, readiness, and negotiation; no task investigation"
       ]
     },
     {
@@ -136,7 +140,8 @@
         "Inspects immutable captured copies and rejects approval of changed origins",
         "Treats an accepted bounded plan as the commitment without redundant task handshakes",
         "Makes and accepts an explicit whole-goal completion proposal; personal completion is insufficient",
-        "Never assumes that automatic digests or protocol agreement establish substantive correctness"
+        "Never assumes that automatic digests or protocol agreement establish substantive correctness",
+        "Uses a short explicit actor-bound connection token and compact delivery receipts; retains the full-path fallback"
       ]
     },
     {
@@ -202,7 +207,94 @@
         "Does not require user-supplied session IDs, registry filenames, or explicit permission text for routine coordination metadata",
         "Resolves the output root from Duet's shared temp_directory and agrees the concrete report path",
         "Keeps task files read-only when the user requests a read-only review and honors an explicit metadata-write prohibition",
-        "Completes only with explicit peer consensus on the shared goal"
+        "Completes only with explicit peer consensus on the shared goal",
+        "Derives and agrees missing completion criteria and a bounded stop/reassessment rule before any task work"
+      ]
+    },
+    {
+      "id": "broad-goal-needs-gate",
+      "prompt": "/goal Use Duet to explore approaches for an offline knowledge assistant.",
+      "expected_output": "Both peers derive a faithful bounded result and acceptance conditions before brainstorming.",
+      "assertions": [
+        "No substantive ideas before the accepted gate",
+        "No request for user-supplied protocol IDs or a compulsory criteria form",
+        "Criteria assess usefulness and constraints, not only an arbitrary idea count"
+      ]
+    },
+    {
+      "id": "impossible-condition-is-not-success",
+      "prompt": "The user requires a proof, but the peers find a counterexample during their bounded investigation.",
+      "expected_output": "Truthful incomplete outcome or user scope decision; no successful proof claim.",
+      "assertions": [
+        "Preserves the original success requirement",
+        "Does not search forever or call budget exhaustion success",
+        "An assessment goal may instead legitimately conclude the proposition is false"
+      ]
+    },
+    {
+      "id": "stale-gate-cannot-close",
+      "prompt": "A completion offer exists; both peers subsequently agree an additional mandatory check.",
+      "expected_output": "Old offer is stale even after processing acknowledgments.",
+      "assertions": [
+        "No acceptance or finish against the old gate",
+        "New evidence maps to all current criteria",
+        "Fresh assent required for the replacement offer"
+      ]
+    },
+    {
+      "id": "late-information-during-provisional-close",
+      "prompt": "One peer has provisionally finished; new contradictory evidence arrives.",
+      "expected_output": "Peer can respond; final close requires renewed assessment and consent.",
+      "assertions": [
+        "Provisional finisher remains able to acknowledge and issue a correction",
+        "Acknowledging the information does not restore old approval",
+        "Returned artifacts always belong to the actual terminal agreement"
+      ]
+    },
+    {
+      "id": "legitimate-optional-cancellation",
+      "prompt": "Both peers abandon an optional investigation after evidence rejects the approach.",
+      "expected_output": "Explicit cancellation/release permits progress without pretending the investigation succeeded.",
+      "assertions": [
+        "No forced completion of irrelevant work",
+        "Cancellation cannot waive a mandatory user condition",
+        "Outstanding completion-blocking waits remain explicit"
+      ]
+    },
+    {
+      "id": "attention-aware-correction",
+      "prompt": "A reviewer wants one sentence corrected while the proposer waits on final acceptance.",
+      "expected_output": "A cheap changes request wakes the waiter and yields a fresh reviewed revision.",
+      "assertions": [
+        "Uses attention-bearing request-changes, not a buried inform",
+        "No unnecessary withdrawal after an objection",
+        "No automatic approval transfer even for editorial changes"
+      ]
+    },
+    {
+      "id": "denied-startup-keeps-gate-and-truth",
+      "prompt": "You joined Duet but the host denied the ready-message command. Determine what is actually permitted and report an unresolved blocker without beginning the task. If premature work already occurred, handle that fact honestly when coordination becomes available.",
+      "expected_output": "Specific permission diagnosis without bypass, pre-gate task work, solo task files, invented peer failure, or a rewritten chronology.",
+      "assertions": [
+        "Uses separate literal script invocations, avoiding wrappers or chained commands that obscure permission matching.",
+        "Does not infer that all coordination is unavailable from one denied operation.",
+        "A differently written operation is used only if independently authorized, never to evade a denial.",
+        "Before gate agreement, an unresolved blocker is reported to the user as coordination status, without task analysis or output files.",
+        "Discloses actual premature work to the peer and retains material deviations in the final report.",
+        "Later agreement cannot waive user criteria or be described as preceding earlier work."
+      ]
+    },
+    {
+      "id": "explicit-conflict-reconciliation",
+      "prompt": "A task owner accepted then declined the same optional request. Reconcile the contradiction with your peer, retain ownership until a legitimate disposition, and complete the unchanged goal. A corrected answer to an unrelated question must not create a new commitment conflict.",
+      "expected_output": "Explicit full-evidence replacement and peer assent, followed by valid task disposition and fresh goal consensus; immutable contradictory history remains visible.",
+      "assertions": [
+        "Corrected answers remain informational.",
+        "A unilateral reconciliation or proposal missing a conflicting reply cannot clear the conflict blocker.",
+        "Competing accepted replacements need a new bilateral replacement citing both agreements.",
+        "Old accepted tasks stay blocking until valid verification or owner release; reconciliation does not establish satisfaction of mandatory user criteria.",
+        "A new contradictory reply stales earlier reconciliation.",
+        "Reviewer handles unread pre-offer findings before goal approval."
       ]
     }
   ]

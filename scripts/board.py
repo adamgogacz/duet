@@ -18,8 +18,8 @@ from locking import file_lock
 from messages import Kind, Message, subject
 from settings import (
     COMPLETION_SCOPE,
-    SESSION_LOCK,
     INITIAL_PLAN_SCOPE,
+    SESSION_LOCK,
     DuetError,
     Settings,
     encoded,
@@ -97,6 +97,7 @@ class Snapshot:
     pending: Mapping[str, tuple[str, ...]]
     invalid: Mapping[str, str]
     conflicts: Mapping[str, tuple[str, ...]]
+    effects: tuple[dict[str, str], ...] = ()
 
     @property
     def history(self) -> dict[str, Message]:
@@ -124,7 +125,6 @@ def find_conflicts(messages: tuple[Message, ...]) -> dict[str, tuple[str, ...]]:
         Kind.DECLINE,
         Kind.AGREE,
         Kind.OBJECT,
-        Kind.ANSWER,
         Kind.SUBMIT,
         Kind.VERIFY,
         Kind.REJECT,
@@ -136,9 +136,22 @@ def find_conflicts(messages: tuple[Message, ...]) -> dict[str, tuple[str, ...]]:
     for message in messages:
         if message.reply_to is not None and message.kind in controls:
             replies.setdefault(message.reply_to, []).append(message.id)
-    return {
-        target: tuple(sorted(ids)) for target, ids in replies.items() if len(ids) > 1
-    }
+    conflicts = {}
+    history = {message.id: message for message in messages}
+    for target, ids in replies.items():
+        if len(ids) <= 1:
+            continue
+        events = [history[key] for key in ids]
+        releases = [item for item in events if item.kind == Kind.RELEASE]
+        if len(releases) == 1 and all(
+            item.kind == Kind.SUBMIT
+            and item.id in ancestry(releases[0].causes, history)
+            for item in events
+            if item.id != releases[0].id
+        ):
+            continue
+        conflicts[target] = tuple(sorted(ids))
+    return conflicts
 
 
 def scan(settings: Settings) -> Snapshot:
@@ -226,7 +239,29 @@ def scan(settings: Settings) -> Snapshot:
         if key not in invalid
     }
     messages = tuple(ordered.values())
-    return Snapshot(messages, pending, invalid, find_conflicts(messages))
+    snapshot = Snapshot(messages, pending, invalid, find_conflicts(messages))
+    effects = []
+    for participant in settings.participants:
+        path = checkpoint_path(settings, participant)
+        if not (path.exists() or path.is_symlink()):
+            continue
+        try:
+            data = strict_json(read_record(path, settings.max_checkpoint_bytes))
+            validate_checkpoint(settings, participant, data, snapshot=snapshot)
+            effects.extend(
+                {**item, "participant": participant}
+                for item in data["external_actions"]
+            )
+        except (DuetError, OSError) as error:
+            effects.append(
+                {
+                    "participant": participant,
+                    "id": f"checkpoint-{participant}",
+                    "status": "invalid",
+                    "summary": str(error),
+                }
+            )
+    return Snapshot(messages, pending, invalid, snapshot.conflicts, tuple(effects))
 
 
 def completion_proposal(message: Message) -> bool:
@@ -238,47 +273,10 @@ def completion_proposal(message: Message) -> bool:
 
 
 def check_completion(message: Message, settings: Settings, snapshot: Snapshot) -> None:
-    """Keep one proposer and one unsettled completion offer; reject stale replies."""
-    history = snapshot.history
-    controls = {Kind.AGREE, Kind.OBJECT, Kind.WITHDRAW}
-    if completion_proposal(message):
-        require(
-            message.sender == settings.completion_proposer,
-            "only the designated completion proposer may propose goal completion",
-        )
-        for proposal in history.values():
-            if not completion_proposal(proposal):
-                continue
-            replies = [
-                item
-                for item in history.values()
-                if item.reply_to == proposal.id and item.kind in controls
-            ]
-            require(
-                bool(replies),
-                "a completion proposal is already pending; reuse it instead of proposing another",
-            )
-            require(
-                proposal.id in snapshot.conflicts
-                or not any(item.kind == Kind.AGREE for item in replies),
-                "completion is already agreed; finish using the existing agreement",
-            )
-    elif message.kind in controls and message.reply_to is not None:
-        target = history[message.reply_to]
-        if not completion_proposal(target):
-            return
-        if message.kind == Kind.AGREE:
-            require(
-                target.sender == settings.completion_proposer,
-                "agree only to the designated proposer's completion proposal",
-            )
-        require(
-            not any(
-                item.reply_to == target.id and item.kind in controls
-                for item in history.values()
-            ),
-            "completion proposal is already settled or conflicted; refresh the board before replying",
-        )
+    """Delegate gate and terminal-control validation to the pure workflow model."""
+    from workflow import check_completion as check
+
+    check(message, settings, snapshot)
 
 
 def publish(
@@ -290,13 +288,15 @@ def publish(
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Serialize closing decisions with enrollment before checking and publishing."""
-    message = Message.parse(raw, settings)
-    guarded = completion_proposal(message) or (
-        message.subject_type == "decision"
-        and message.kind in {Kind.AGREE, Kind.OBJECT, Kind.WITHDRAW}
-    )
+    # Every publication is serialized against the final closing transition.
     lock = nullcontext()
-    if guarded and not dry_run:
+    enrolled = (settings.board / "enrollment" / "run.json").exists()
+    parsed = Message.parse(raw, settings)
+    guarded = completion_proposal(parsed) or (
+        parsed.subject_type == "decision"
+        and parsed.kind in {Kind.AGREE, Kind.OBJECT, Kind.WITHDRAW}
+    )
+    if not dry_run and (enrolled or guarded):
         root = directory(settings.board, ("enrollment",), create=True)
         lock = file_lock(root / SESSION_LOCK)
     with lock:
@@ -343,6 +343,20 @@ def _publish(
         "causal prerequisite is missing or invalid",
     )
     message.check_response(history)
+    if message.kind == Kind.SUBMIT:
+        cursor = history[message.reply_to]
+        accepted = set()
+        while cursor.reply_to is not None:
+            if cursor.kind == Kind.ACCEPT:
+                accepted.add(cursor.id)
+            cursor = history[cursor.reply_to]
+        require(
+            not any(
+                item.kind == Kind.RELEASE and item.reply_to in accepted
+                for item in history.values()
+            ),
+            "task was released; use a new accepted request instead of resubmitting",
+        )
     check_completion(message, settings, snapshot)
     if message.kind not in {Kind.READY, Kind.INFORM, Kind.ALERT, Kind.RECEIPT}:
         for sender in settings.participants:
@@ -372,6 +386,35 @@ def _publish(
             "session already announced readiness; retry the original ID",
         )
     initial = opening(settings, history, snapshot.conflicts)
+    if message.kind in {
+        Kind.REQUEST,
+        Kind.ACCEPT,
+        Kind.DECLINE,
+        Kind.SUBMIT,
+        Kind.VERIFY,
+        Kind.REJECT,
+        Kind.AWAIT,
+        Kind.RESUME,
+        Kind.RELEASE,
+    } or message.body.get("artifacts"):
+        require(
+            initial.agreement is not None and not initial.conflicted,
+            "agree completion criteria before substantive task work or attachments",
+        )
+    if message.kind == Kind.WITHDRAW and history[message.reply_to].kind == Kind.REQUEST:
+        require(
+            not any(
+                item.kind == Kind.ACCEPT and item.reply_to == message.reply_to
+                for item in history.values()
+            ),
+            "an accepted task must be released by its owner, not withdrawn by its requester",
+        )
+    if message.kind in {Kind.AGREE, Kind.VERIFY}:
+        from artifacts import verify
+
+        for reference in history[message.reply_to].body.get("artifacts", []):
+            if reference["revision"].startswith("sha256:"):
+                verify(settings, reference, current_origin=True)
     predecessors = ancestry(message.causes, history)
     if message.kind == Kind.PROPOSE:
         if message.subject_id == settings.initial_plan_id or initial.proposal is None:
@@ -402,10 +445,44 @@ def _publish(
                 )
         elif initial.agreement is None:
             require(
-                not initial.conflicted
-                and initial.proposal.id in predecessors
+                initial.proposal.id in predecessors
                 and tuple(message.body["scope"]) == INITIAL_PLAN_SCOPE,
                 "before startup agreement, propose a counterplan citing the opening proposal",
+            )
+            if initial.conflicted:
+                required = {
+                    item.id
+                    for item in history.values()
+                    if item.kind == Kind.AGREE
+                    and tuple(history[item.reply_to].body.get("scope", []))
+                    == INITIAL_PLAN_SCOPE
+                }
+                require(
+                    required <= predecessors,
+                    "a reconciled gate must cite all competing agreements",
+                )
+    if (
+        message.kind in {Kind.AGREE, Kind.OBJECT, Kind.WITHDRAW}
+        and message.reply_to is not None
+    ):
+        target = history[message.reply_to]
+        if (
+            target.kind == Kind.PROPOSE
+            and tuple(target.body["scope"]) == INITIAL_PLAN_SCOPE
+        ):
+            if message.kind == Kind.AGREE and initial.agreement is not None:
+                require(
+                    target.id == initial.agreement.reply_to
+                    or target.id not in ancestry(initial.agreement.causes, history),
+                    "gate proposal was superseded; review the current gate or propose an amendment",
+                )
+            require(
+                not any(
+                    item.reply_to == target.id
+                    and item.kind in {Kind.AGREE, Kind.OBJECT, Kind.WITHDRAW}
+                    for item in history.values()
+                ),
+                "gate proposal is already settled; propose an explicit amendment",
             )
     if message.kind == Kind.REQUEST:
         require(
@@ -441,6 +518,22 @@ def checkpoint_path(settings: Settings, participant: str) -> Path:
 
 
 def save_checkpoint(
+    settings: Settings,
+    participant: str,
+    session: str,
+    raw: bytes,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Serialize reported effects and processing state against terminal closing."""
+    lock = nullcontext()
+    if not dry_run and (settings.board / "enrollment" / "run.json").exists():
+        lock = file_lock(directory(settings.board, ("enrollment",)) / SESSION_LOCK)
+    with lock:
+        return _save_checkpoint(settings, participant, session, raw, dry_run=dry_run)
+
+
+def _save_checkpoint(
     settings: Settings,
     participant: str,
     session: str,

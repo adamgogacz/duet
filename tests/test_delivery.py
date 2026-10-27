@@ -221,6 +221,7 @@ class DeliveryTests(BoardFixture):
 
     def test_durable_wait_uses_its_original_deadline(self) -> None:
         self.question()
+        self.initial_plan()
         self.send(
             self.message(
                 "durable-wait",
@@ -261,6 +262,7 @@ class DeliveryTests(BoardFixture):
 
     def test_durable_wait_wakes_only_for_its_condition(self) -> None:
         self.question()
+        self.initial_plan()
         self.send(
             self.message(
                 "durable-wait",
@@ -371,6 +373,7 @@ class DeliveryTests(BoardFixture):
         self,
     ) -> None:
         self.question()
+        self.initial_plan()
         self.send(
             self.message(
                 "durable-wait",

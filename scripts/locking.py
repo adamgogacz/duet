@@ -43,7 +43,7 @@ def file_lock(path: Path, clock: Clock | None = None) -> Iterator[None]:
                     raise
                 remaining = stop - monotonic()
                 require(remaining > 0, "coordination is busy; retry the same operation")
-                sleep(min(Settings.default("poll_interval_seconds"), remaining))
+                sleep(min(Settings.default("lock_poll_interval_seconds"), remaining))
         yield
     finally:
         os.close(descriptor)

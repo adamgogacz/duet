@@ -80,3 +80,13 @@ session board. A separate container, remote machine, or differing mount layout
 needs a shared-filesystem arrangement; installing the skill alone does not
 establish transport. The utility uses POSIX filesystem operations, so native
 Windows requires a compatible Linux environment such as WSL.
+
+## Updating from an earlier Duet workflow
+
+This workflow requires structured completion criteria and a stop condition in the
+accepted opening. Stop old utility processes before replacing their code. Start
+fresh agent conversations after updating, so they read the current instructions.
+Old paired sessions remain history and do not block new pairing. Do not rewrite
+old journals or transfer their consent into a new session. Existing symlinks to
+the same checkout already expose updated files; refresh installed copies together,
+including all scripts and references.

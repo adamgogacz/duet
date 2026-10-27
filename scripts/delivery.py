@@ -271,6 +271,22 @@ def wait_for_messages(
                 in {Kind.ASK, Kind.REQUEST, Kind.PROPOSE, Kind.SUBMIT},
                 "reply target must be an ask, request, propose or submit; use a durable wait for other conditions",
             )
+        if reply_to is not None:
+            from artifacts import verify
+            from workflow import is_completion, stale_reasons
+
+            target = history[reply_to]
+            if is_completion(target):
+                changed = bool(stale_reasons(settings, received.snapshot, target))
+                try:
+                    for reference in target.body.get("artifacts", []):
+                        verify(settings, reference, current_origin=True)
+                except (DuetError, OSError):
+                    changed = True
+                if changed:
+                    return WaitResult(
+                        ExitCode.ATTENTION, "completion-context-changed", received
+                    )
         if wait_id is not None:
             identifier(wait_id, "wait_id")
             require(

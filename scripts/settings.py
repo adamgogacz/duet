@@ -22,6 +22,7 @@ DEFAULT_CONTEXT_REVISION = "initial"
 PROJECT_LABEL_LIMIT = 32
 AUTO_PARTICIPANTS = ("peer-a", "peer-b")
 COMPLETION_SCOPE = ("goal-completion",)
+CONFLICT_RESOLUTION_SCOPE = ("conflict-resolution",)
 PROJECT_REGISTRY = ".duet.jsonl"
 PROJECT_LOCK = ".duet.lock"
 SESSION_LOCK = "session.lock"
@@ -140,6 +141,7 @@ class Settings:
     max_artifact_bytes: int = 16777216
     invitation_ttl_seconds: float = 300
     max_registry_bytes: int = 16777216
+    lock_poll_interval_seconds: float = 0.01
 
     @classmethod
     def default(cls, name: str) -> Any:
@@ -205,6 +207,7 @@ class Settings:
             "poll_interval_seconds",
             "wait_timeout_seconds",
             "invitation_ttl_seconds",
+            "lock_poll_interval_seconds",
         ):
             value = getattr(settings, name)
             if name == "wait_timeout_seconds" and value is None:

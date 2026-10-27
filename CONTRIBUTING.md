@@ -28,7 +28,7 @@ ruff check .
 ruff format --check .
 ```
 
-The checked-in Ruff configuration handles standalone test imports. CI runs the
+The checked-in Ruff configuration handles standalone test imports. CI is configured to run the
 suite on Linux with Python 3.11 and 3.14, and macOS with Python 3.14. New runtime
 dependencies need a concrete requirement; keep standard-library operation intact.
 
@@ -51,16 +51,25 @@ Preserve these invariants:
   state separate. A fresh conversation never borrows an old paired identity.
 - Retain immutable messages and exact retry identities. Receiving never grants
   approval or acknowledges unhandled messages.
-- Require explicit consensus on the whole goal and the exact artifact revisions.
-  Individual completion and silence do not establish agreement.
+- Require an accepted completion gate before substantive work, including for broad
+  goals where peers derive the conditions. Bound unsuccessful work without calling
+  it successful completion.
+- Bind explicit whole-goal consent and provisional closing to the effective gate,
+  current evidence, exact artifact revisions, and legitimate obligation dispositions.
+  Individual completion, processing acknowledgments, and silence grant no consent.
 - Keep task authority with the user and substantive judgment with the peers.
 
 ## Evaluate agent behavior
 
 `evals/trigger-queries.json` contains activation cases. `evals/outcomes.json`
-contains interaction scenarios and assertions. For instruction changes, compare
+contains interaction scenarios and assertions. `evals/substantive-outcomes.json`
+contains small tasks with independently checkable answers or constraint rubrics.
+Give peers only the goal and input, not the expected outcome; score against the
+reference evidence rather than another agreement vote. For instruction changes, compare
 old/new behavior under matched conditions and inspect traces as well as reports.
 Structural checks and utility tests are not evidence of live-agent quality.
+The opt-in [live suite](evals/live/README.md) runs two actual CLI agents with native
+`/goal` loops, private traces, bounded spend, and separate substantive grading.
 
 For a bug report, include client/OS/Python versions, the command or relevant
 prompt, and a minimal reproduction. Redact participant credentials, private task

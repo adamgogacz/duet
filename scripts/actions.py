@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -13,7 +15,7 @@ from typing import Any
 
 from artifacts import capture, verify
 from board import atomic_write, directory, publish, read_record, scan
-from delivery import acknowledge, receive
+from delivery import acknowledge
 from enrollment import check_membership
 from locking import file_lock
 from messages import Kind, Message
@@ -27,8 +29,9 @@ from settings import (
     nonempty,
     require,
     strict_json,
+    temporary_directory,
 )
-from startup import opening
+from startup import causal_frontier, opening
 
 
 @dataclass(frozen=True)
@@ -45,8 +48,15 @@ class Connection:
         return Settings.load(self.settings_path)
 
     @classmethod
-    def load(cls, path: Path) -> Connection:
+    def load(cls, path: Path | str) -> Connection:
         """Validate a retained identity without guessing an anonymous participant."""
+        token = str(path)
+        short = re.fullmatch(r"conn-[0-9a-f]{32}", token) is not None
+        path = (
+            directory(temporary_directory(), ("duet", "connections")) / f"{token}.json"
+            if short
+            else Path(path)
+        )
         data = strict_json(read_record(path, Settings.default("max_checkpoint_bytes")))
         require(set(data) == set(cls.__dataclass_fields__), "invalid connection record")
         settings_path = Path(
@@ -61,6 +71,10 @@ class Connection:
             identifier(data["session"], "session"),
         )
         connection.settings.check_actor(connection.participant, connection.session)
+        require(
+            not short or token == connection.short_handle,
+            "connection handle does not match its saved actor",
+        )
         return connection
 
     def save(self) -> Path:
@@ -84,6 +98,34 @@ class Connection:
             replace=False,
         )
         return path
+
+    @property
+    def short_handle(self) -> str:
+        """Bind a compact capability explicitly to this actor and collaboration."""
+        raw = encoded(
+            {
+                "settings_path": str(self.settings_path),
+                "participant": self.participant,
+                "session": self.session,
+            }
+        )
+        return "conn-" + hashlib.sha256(raw).hexdigest()[:32]
+
+    def save_alias(self) -> str:
+        """Save an optional local-temp lookup; never infer identity from a workspace."""
+        root = directory(temporary_directory(), ("duet", "connections"), create=True)
+        atomic_write(
+            root / f"{self.short_handle}.json",
+            encoded(
+                {
+                    "settings_path": str(self.settings_path),
+                    "participant": self.participant,
+                    "session": self.session,
+                }
+            ),
+            replace=False,
+        )
+        return self.short_handle
 
 
 def _outbox(connection: Connection, *, create: bool) -> Path:
@@ -124,6 +166,8 @@ def compose(
     reply_to: str | None = None,
     scope: Sequence[str] | None = None,
     criteria: Sequence[str] | None = None,
+    stop_condition: str | None = None,
+    outcome: str = "complete",
     evidence: Sequence[str] | None = None,
     artifacts: Sequence[Path] = (),
     subject_type: str | None = None,
@@ -161,6 +205,9 @@ def compose(
         if value is not None:
             require(field not in payload, f"{field} was supplied twice")
             payload[field] = list(value)
+    if stop_condition is not None:
+        require("stop_condition" not in payload, "stop condition supplied twice")
+        payload["stop_condition"] = stop_condition
     if kind == Kind.READY:
         payload.setdefault("context_revision", settings.context_revision)
         subject_type, subject_id = "goal", settings.goal
@@ -169,6 +216,10 @@ def compose(
     if kind == Kind.SUBMIT:
         payload.setdefault("artifacts", [])
     if artifacts:
+        require(
+            opening(settings, history, snapshot.conflicts).agreement is not None,
+            "agree completion criteria before capturing task artifacts",
+        )
         payload["artifacts"] = [
             capture(settings, path, dry_run=dry_run).reference() for path in artifacts
         ]
@@ -201,24 +252,45 @@ def compose(
         and initial.proposal is not None
     ):
         causal.add(initial.proposal.id)
-    if kind == Kind.REQUEST and initial.agreement is not None:
+        if initial.conflicted:
+            causal.update(
+                item.id
+                for item in history.values()
+                if item.kind == Kind.AGREE
+                and tuple(history[item.reply_to].body.get("scope", []))
+                == INITIAL_PLAN_SCOPE
+            )
+    if (
+        kind == Kind.PROPOSE
+        and tuple(payload.get("scope", [])) == INITIAL_PLAN_SCOPE
+        and initial.agreement is not None
+    ):
         causal.add(initial.agreement.id)
-    if kind == Kind.PROPOSE and tuple(payload.get("scope", [])) == COMPLETION_SCOPE:
-        # Own publications and explicitly processed messages form the proposer’s known context.
-        received = receive(settings, connection.participant)
-        require(
-            received.checkpoint_error is None,
-            "recover the invalid checkpoint before completion",
-        )
+    if kind == Kind.RELEASE and target is not None:
         causal.update(
             item.id
             for item in history.values()
-            if item.sender == connection.participant
+            if item.subject_type == target.subject_type
+            and item.subject_id == target.subject_id
         )
-        if received.checkpoint is not None:
-            causal.update(received.checkpoint["processed"])
-        if initial.agreement is not None:
-            causal.add(initial.agreement.id)
+    if kind == Kind.REQUEST and initial.agreement is not None:
+        causal.add(initial.agreement.id)
+    if kind == Kind.PROPOSE and tuple(payload.get("scope", [])) == COMPLETION_SCOPE:
+        require(
+            initial.agreement is not None,
+            "agree completion criteria before proposing completion",
+        )
+        require(
+            "gate" not in payload and "outcome" not in payload,
+            "gate and outcome are constructed by the utility",
+        )
+        from workflow import effect_fingerprint
+
+        payload["effects"] = effect_fingerprint(snapshot)
+        payload["gate"] = initial.agreement.id
+        payload["outcome"] = outcome
+        # A closing offer pins the journal basis; later task messages require fresh assent.
+        causal.update(causal_frontier(history))
     key = f"{connection.participant}-{uuid.uuid4().hex}"
     subject_type = subject_type or {
         Kind.ASK: "question",
@@ -252,6 +324,22 @@ def _deliver(connection: Connection, raw: bytes, root: Path) -> dict:
     """Publish one saved envelope, then acknowledge only its handled reply target."""
     settings = connection.settings
     message = Message.parse(raw, settings)
+    history = scan(settings).history
+    if message.id in history:
+        from enrollment import find_run, membership_paths
+
+        path, _ = membership_paths(settings.board)
+        if path.exists() and find_run(settings.board, settings.goal).terminal:
+            require(
+                history[message.id].raw == raw,
+                "message ID already exists with different bytes",
+            )
+            return {
+                "id": message.id,
+                "published": False,
+                "duplicate": True,
+                "message": strict_json(raw),
+            }
     check_membership(settings, connection.participant, connection.session)
     try:
         history = scan(settings).history

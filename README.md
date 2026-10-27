@@ -12,7 +12,7 @@ environment. **Native Windows is not supported.**
 
 | Environment | Status |
 | --- | --- |
-| ✅ Linux | Tested: all 127 tests passed on Python 3.11 and 3.14. |
+| ✅ Linux | Tested on Python 3.11 and 3.14. |
 | 🟡 macOS | Expected to work; a macOS test run has not yet verified it. |
 | ❌ Native Windows | Blocked by Unix-only file locking and filesystem operations. |
 | 🟡 Windows through WSL | Expected to work when both agents run inside the same Linux environment and share its paths; not yet verified. |
@@ -64,7 +64,7 @@ sequenceDiagram
     Note right of A: Wait for the peer
     You->>B: Start CLI 2 and submit the same /goal prompt
     Note over A,B: Same project, both goal loops running
-    A->>B: Propose scope and responsibilities
+    A->>B: Propose scope, done criteria, and work limits
     B->>A: Agree on the plan
 
     loop Until both agree the task is complete
@@ -147,17 +147,23 @@ advertises a fresh session; a fourth joins it. Both pairs may work simultaneousl
 even on the same task. Old paired sessions, whether completed or interrupted,
 never block new pairing. Each pair has its own board and generated credentials.
 
-Both peers announce readiness, then agree on bounded responsibilities, criteria,
-artifact location, final writer, and a single completion proposer. An accepted plan
-establishes those commitments without repeated task handshakes. The peers work
-independently, exchange findings, challenge claims, and review concrete evidence.
+Both peers announce readiness, then agree on scope, completion criteria, and a
+bounded stop/reassessment condition before investigating or doing other task work.
+They preserve user-supplied criteria or derive them from a broader goal. The same
+opening establishes responsibilities, method, output location, and final writer;
+it needs no extra gate-negotiation phase. The peers then work, challenge claims,
+and review evidence using the method appropriate to the task.
 
 Routine conversation uses plain text. The utility constructs envelopes, retains
 retry IDs, captures artifact bytes and digests, and derives reply references.
 Reading does not acknowledge a message. Bounded waits handle dependencies without
 equating silence with agreement. One peer proposes whole-goal completion at exact
 artifact revisions; the other explicitly agrees or objects. The utility handles
-bilateral closing. Two individual “done” statements never constitute consensus.
+bilateral closing. Its acknowledgments stay provisional: changed gates, new task
+information, or changed report bytes require renewed consent before final closure.
+Two individual “done” statements never constitute consensus. If required criteria
+cannot be met, peers may agree an explicitly incomplete outcome; reaching a work
+limit never turns failure into success.
 
 ## 💾 Storage and limits
 
@@ -195,6 +201,7 @@ on a filesystem supporting advisory locks, hard links, and atomic replacement.
 - [Installation](docs/installation.md): copies, symlinks, and updates.
 - [Distribution choices](docs/distribution.md): comparable projects and rationale.
 - [Contributing](CONTRIBUTING.md): tests and behavior evaluation.
+- [Live evaluations](evals/live/README.md): two native `/goal` agents on isolated tasks.
 
 Run the standard-library test suite from this repository:
 

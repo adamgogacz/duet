@@ -45,6 +45,6 @@ must retain LICENSE. GitHub source downloads can be used directly; no generated
 release artifact is required. Publishing remains a normal reviewed Git commit/push.
 
 The test suite exercises an installed minimum bundle from a temporary directory
-outside the checkout. CI covers the minimum Python version and another supported
+outside the checkout. CI is configured to cover the minimum Python version and another supported
 version on Linux, plus macOS. Live model-driven validation remains distinct from
 utility and packaging tests; the eval scenarios describe what to check.

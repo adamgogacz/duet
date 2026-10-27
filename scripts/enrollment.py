@@ -21,10 +21,9 @@ from messages import Kind
 from pairing import Invitation, Lobby, append_event, read_lobby
 from settings import (
     AUTO_PARTICIPANTS,
-    COMPLETION_SCOPE,
-    SESSION_LOCK,
     PROJECT_LOCK,
     PROJECT_REGISTRY,
+    SESSION_LOCK,
     ExitCode,
     Settings,
     encoded,
@@ -54,17 +53,27 @@ class Run:
     settings_path: str
     members: tuple[Member, ...]
     agreement: str | None = None
+    outcome: str = "complete"
 
     @property
     def complete(self) -> bool:
         """Both peers must observe the same explicit completion agreement."""
+        return self.terminal and self.outcome == "complete"
+
+    @property
+    def terminal(self) -> bool:
+        """Individual closing flags are provisional until both actors finish."""
         return all(member.finished for member in self.members)
 
     @classmethod
     def load(cls, path: Path) -> Run:
         """Validate local session state instead of searching other conversations."""
         data = strict_json(read_record(path, Settings.default("max_checkpoint_bytes")))
+        data.setdefault("outcome", "complete")
         require(set(data) == set(cls.__dataclass_fields__), "invalid enrollment fields")
+        require(
+            data["outcome"] in {"complete", "incomplete"}, "invalid terminal outcome"
+        )
         identifier(data["goal"], "enrollment.goal")
         nonempty(data["task"], "task")
         for name in ("workspace", "settings_path"):
@@ -110,6 +119,7 @@ class Run:
             data["settings_path"],
             tuple(members),
             data["agreement"],
+            data["outcome"],
         )
 
 
@@ -385,7 +395,7 @@ def check_membership(settings: Settings, participant: str, session: str) -> None
         (item for item in run.members if item.participant == participant), None
     )
     require(
-        member is not None and member.session == session and not member.finished,
+        member is not None and member.session == session and not run.terminal,
         "session is not an active enrolled writer for this task",
     )
     state = pairing_state(settings)
@@ -422,40 +432,24 @@ def finish(
     clock: Clock | None = None,
     dry_run: bool = False,
 ) -> tuple[dict[str, Any], ExitCode]:
-    """Confirm bilateral completion and wait briefly for the peer to observe it too."""
+    """Revalidate each provisional acknowledgment under the publication lock."""
+    from artifacts import verify
+    from workflow import validate_approval
+
     settings.check_actor(participant, session)
     identifier(agreement, "completion agreement")
     require(
         pairing_state(settings, clock=clock) == "paired",
         "pair both participants before finishing",
     )
-    snapshot = scan(settings)
-    approved = snapshot.history.get(agreement)
-    require(
-        approved is not None
-        and approved.kind == Kind.AGREE
-        and approved.reply_to not in snapshot.conflicts,
-        "completion requires an unconflicted peer agreement",
-    )
-    proposal = snapshot.history[approved.reply_to]
-    require(
-        proposal.subject_type == "decision"
-        and tuple(proposal.body["scope"]) == COMPLETION_SCOPE,
-        "completion proposal must use the goal-completion scope",
-    )
     duration = settings.wait_timeout_seconds if timeout is None else timeout
     require(
-        type(duration) in (int, float) and duration > 0,
+        type(duration) in (int, float) and math.isfinite(duration) and duration > 0,
         "finish needs a finite positive command budget",
     )
-    require(math.isfinite(duration), "finish needs a finite positive command budget")
     clock = clock if clock is not None else SystemClock()
     with nullcontext() if dry_run else session_lock(settings.board, clock):
         current = find_run(settings.board, settings.goal)
-        require(
-            current.agreement in (None, agreement),
-            "peers must finish against the same completion agreement",
-        )
         require(
             any(
                 item.participant == participant and item.session == session
@@ -463,15 +457,50 @@ def finish(
             ),
             "unknown completion session",
         )
+        if current.terminal:
+            require(
+                current.agreement == agreement, "finish against the terminal agreement"
+            )
+            snapshot = scan(settings)
+            approved = snapshot.history.get(agreement)
+            require(approved is not None, "terminal agreement history unavailable")
+            proposal = validate_approval(settings, snapshot, approved, historical=True)
+            require(
+                current.outcome == proposal.body["outcome"],
+                "terminal outcome differs from its approval",
+            )
+            for reference in proposal.body.get("artifacts", []):
+                verify(settings, reference)
+            return terminal_result(current), ExitCode.OK
+        snapshot = scan(settings)
+        approved = snapshot.history.get(agreement)
+        require(
+            approved is not None and approved.kind == Kind.AGREE,
+            "completion requires an unconflicted peer agreement",
+        )
+        proposal = validate_approval(settings, snapshot, approved)
+        for reference in proposal.body.get("artifacts", []):
+            verify(settings, reference, current_origin=True)
+        members = (
+            current.members
+            if current.agreement == agreement
+            else tuple(replace(item, finished=False) for item in current.members)
+        )
         members = tuple(
             replace(item, finished=True) if item.participant == participant else item
-            for item in current.members
+            for item in members
         )
-        current = replace(current, members=members, agreement=agreement)
+        current = replace(
+            current,
+            members=members,
+            agreement=agreement,
+            outcome=proposal.body["outcome"],
+        )
         if dry_run:
             return {
                 "dry_run": True,
                 "would_complete": current.complete,
+                "would_stop": current.terminal,
                 "goal": current.goal,
                 "agreement": agreement,
             }, ExitCode.OK
@@ -480,20 +509,41 @@ def finish(
     stop = clock.monotonic() + duration
     while True:
         observed = find_run(settings.board, settings.goal)
-        if observed.complete:
+        if observed.terminal:
+            return terminal_result(observed), ExitCode.OK
+        try:
+            latest = scan(settings)
+            approval = latest.history.get(agreement)
+            require(approval is not None, "completion agreement unavailable")
+            proposal = validate_approval(settings, latest, approval)
+            for reference in proposal.body.get("artifacts", []):
+                verify(settings, reference, current_origin=True)
+        except (ValueError, OSError) as error:
             return {
-                "status": "complete",
-                "complete": True,
-                "goal": settings.goal,
-                "agreement": agreement,
-            }, ExitCode.OK
+                "status": "revision-required",
+                "complete": False,
+                "terminal": False,
+                "reason": str(error),
+            }, ExitCode.ATTENTION
         remaining = stop - clock.monotonic()
         if remaining <= 0:
             return {
                 "status": "closing",
                 "complete": False,
+                "terminal": False,
                 "goal": settings.goal,
                 "agreement": agreement,
-                "next_action": "repeat-finish-with-the-same-agreement",
+                "next_action": "continue complete with the same connection",
             }, ExitCode.TIMEOUT
         clock.sleep(min(settings.poll_interval_seconds, remaining))
+
+
+def terminal_result(run: Run) -> dict[str, Any]:
+    """A bounded unsuccessful stop never claims that the user's goal was achieved."""
+    return {
+        "status": run.outcome,
+        "complete": run.complete,
+        "terminal": run.terminal,
+        "goal": run.goal,
+        "agreement": run.agreement,
+    }

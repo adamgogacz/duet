@@ -2,6 +2,7 @@
 .duet.json
 .duet.jsonl
 .duet.lock
+.duet-*
 
 # Python and developer tooling
 __pycache__/

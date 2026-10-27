@@ -19,18 +19,20 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from board import publish, scan
+from delivery import receive, wait_for_messages
 from enrollment import (
     Run,
     check_membership,
+    find_run,
     finish,
     join,
     membership_paths,
+    pairing_state,
+    renew_invitation,
     session_status,
 )
-from settings import DuetError, ExitCode, Settings, encoded
 from pairing import read_lobby
-from enrollment import find_run, pairing_state, renew_invitation
-from delivery import wait_for_messages, receive
+from settings import DuetError, ExitCode, Settings, encoded
 from test_delivery import FakeClock
 from test_duet import BoardFixture
 
@@ -59,6 +61,21 @@ class EnrollmentTests(BoardFixture):
         """Publish under the assigned identity and current registry guard."""
         settings = Settings.load(Path(connection["settings_path"]))
         check_membership(settings, connection["participant"], connection["session"])
+        if (
+            kind == "propose"
+            and body is not None
+            and body.get("scope") == ["goal-completion"]
+        ):
+            from workflow import effect_fingerprint, gate
+
+            current = gate(settings, scan(settings))
+            body = {
+                **body,
+                "gate": current.agreement.id,
+                "evidence": ["Fixture evidence for the agreed criterion"],
+                "outcome": "complete",
+                "effects": effect_fingerprint(scan(settings)),
+            }
         raw = encoded(
             {
                 "id": key,
@@ -102,6 +119,8 @@ class EnrollmentTests(BoardFixture):
             body={
                 "proposal": "Divide scientific and implementation review",
                 "scope": ["work-division"],
+                "criteria": ["Produce the agreed evidence-based result"],
+                "stop_condition": "Stop incomplete if the bounded checks cannot establish the required evidence",
             },
         )
         self.event(
@@ -207,11 +226,14 @@ class EnrollmentTests(BoardFixture):
         self.assertTrue(result["complete"])
 
     def test_enrolled_identity_guard_blocks_unknown_and_finished_writers(self) -> None:
-        first, _, agreement = self.completed_audit()
+        first, second, agreement = self.completed_audit()
         settings = Settings.load(Path(first["settings_path"]))
         with self.assertRaisesRegex(DuetError, "active enrolled writer"):
             check_membership(settings, first["participant"], "unknown-session")
         self.close(first, agreement)
+        # A provisional finisher can still assess and answer late information.
+        check_membership(settings, first["participant"], first["session"])
+        self.close(second, agreement)
         with self.assertRaisesRegex(DuetError, "active enrolled writer"):
             check_membership(settings, first["participant"], first["session"])
 
@@ -219,7 +241,9 @@ class EnrollmentTests(BoardFixture):
         self,
     ) -> None:
         first, second, agreement = self.completed_audit()
-        with self.assertRaisesRegex(DuetError, "goal-completion"):
+        with self.assertRaisesRegex(
+            DuetError, "current unconflicted completion agreement"
+        ):
             self.close(first, "division-agreed")
         settings = Settings.load(Path(first["settings_path"]))
         result, code = finish(
@@ -631,9 +655,11 @@ class EnrollmentTests(BoardFixture):
         first = join(self.root, self.task)
         path = self.root / ".duet.jsonl"
         raw = path.read_bytes()
-        with patch("pairing.atomic_write", side_effect=OSError("interrupted write")):
-            with self.assertRaises(OSError):
-                join(self.root, self.task)
+        with (
+            patch("pairing.atomic_write", side_effect=OSError("interrupted write")),
+            self.assertRaises(OSError),
+        ):
+            join(self.root, self.task)
         self.assertEqual(path.read_bytes(), raw)
         self.assertFalse(read_lobby(self.root).invitations[0].paired)
         target = self.root / "saved-registry"

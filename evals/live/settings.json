@@ -1,0 +1,14 @@
+{
+  "claude_executable": "claude",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "wall_seconds": 600,
+  "per_agent_budget_usd": 3.0,
+  "start_gap_seconds": 1.0,
+  "poll_seconds": 0.5,
+  "status_seconds": 30.0,
+  "audit_input_bytes": 131072,
+  "audit_timeout_seconds": 5,
+  "terminate_grace_seconds": 15,
+  "kill_wait_seconds": 5
+}

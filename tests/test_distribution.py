@@ -129,3 +129,92 @@ class DistributionTests(unittest.TestCase):
         for target in re.findall(r"\]\(([^)]+)\)", manifest):
             if not target.startswith(("https://", "http://", "#")):
                 self.assertTrue((self.installed / target).is_file(), target)
+
+    def test_minimum_copy_completes_gate_bound_review_with_short_handles(self) -> None:
+        """Exercise the public workflow from a copy with distinct caller temp roots."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        peers = [
+            self.result(
+                "join",
+                "--workspace",
+                str(self.project),
+                peer=index,
+                text="Review the fixture and agree on an evidence-based report",
+            )
+            for index in range(2)
+        ]
+        for index, peer in enumerate(peers):
+            self.result(
+                "send",
+                "--connection",
+                peer["connection"],
+                "--kind",
+                "ready",
+                "--text",
+                "Ready to negotiate the fixture gate",
+                peer=index,
+            )
+        plan = self.result(
+            "send",
+            "--connection",
+            peers[0]["connection"],
+            "--kind",
+            "propose",
+            "--scope",
+            "work-division",
+            "--criteria",
+            "Deliver the checked fixture report",
+            "--stop-condition",
+            "Stop incomplete if the bounded fixture checks cannot establish the result",
+            "--text",
+            "A writes the report; B independently checks it",
+            peer=0,
+        )
+        self.result(
+            "send",
+            "--connection",
+            peers[1]["connection"],
+            "--kind",
+            "agree",
+            "--reply-to",
+            plan["id"],
+            peer=1,
+        )
+        report = self.temps[0] / "report.md"
+        report.write_text("Fixture report with checked evidence\n")
+        proposed = self.command(
+            "complete",
+            "--connection",
+            peers[0]["connection"],
+            "--propose",
+            "--artifact",
+            str(report),
+            "--evidence",
+            "Both inspected the fixture evidence",
+            "--text",
+            "Whole fixture review complete",
+            "--timeout-seconds",
+            "0.01",
+            peer=0,
+        )
+        self.assertEqual(proposed.returncode, 2, proposed.stderr)
+        offer = json.loads(proposed.stdout)["proposal"]
+
+        def close(index: int) -> subprocess.CompletedProcess[str]:
+            args = [
+                "complete",
+                "--connection",
+                peers[index]["connection"],
+                "--timeout-seconds",
+                "3",
+            ]
+            if index:
+                args.extend(["--agree", offer])
+            return self.command(*args, peer=index)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(close, range(2)))
+        for result in results:
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["status"], "complete")

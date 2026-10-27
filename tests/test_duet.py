@@ -162,6 +162,8 @@ class BoardFixture(unittest.TestCase):
             body={
                 "proposal": "Divide implementation and review",
                 "scope": ["work-division"],
+                "criteria": ["Produce the agreed evidence-based result"],
+                "stop_condition": "Stop incomplete if the bounded checks cannot establish the required evidence",
             },
         )
         publish(settings, proposer, f"session-{proposer}", proposal)
@@ -341,6 +343,10 @@ class BoardTests(BoardFixture):
                             body={
                                 "proposal": "I started first",
                                 "scope": ["work-division"],
+                                "criteria": [
+                                    "Produce the agreed evidence-based result"
+                                ],
+                                "stop_condition": "Stop incomplete if the bounded checks cannot establish the required evidence",
                             },
                         )
                     )
@@ -388,7 +394,12 @@ class BoardTests(BoardFixture):
                     subject_type="decision",
                     subject_id=self.settings.initial_plan_id,
                     causes=["alpha-ready"],
-                    body={"proposal": "Work division", "scope": ["work-division"]},
+                    body={
+                        "proposal": "Work division",
+                        "scope": ["work-division"],
+                        "criteria": ["Produce checked output"],
+                        "stop_condition": "Stop incomplete if bounded checks cannot establish the result",
+                    },
                 )
             )
 
@@ -409,7 +420,7 @@ class BoardTests(BoardFixture):
                 "criteria": ["Checked"],
             },
         )
-        with self.assertRaisesRegex(DuetError, "work division must be agreed"):
+        with self.assertRaisesRegex(DuetError, "agree completion criteria"):
             self.send(request)
         agreement = self.initial_plan()
         with self.assertRaisesRegex(DuetError, "causally include"):
@@ -428,7 +439,12 @@ class BoardTests(BoardFixture):
                 subject_type="decision",
                 subject_id=self.settings.initial_plan_id,
                 causes=["alpha-ready", "beta-ready"],
-                body={"proposal": "First division", "scope": ["work-division"]},
+                body={
+                    "proposal": "First division",
+                    "scope": ["work-division"],
+                    "criteria": ["Produce checked output"],
+                    "stop_condition": "Stop incomplete if bounded checks cannot establish the result",
+                },
             )
         )
         self.send(
@@ -442,6 +458,8 @@ class BoardTests(BoardFixture):
                 body={
                     "proposal": "Reverse the responsibilities",
                     "scope": ["work-division"],
+                    "criteria": ["Produce the agreed evidence-based result"],
+                    "stop_condition": "Stop incomplete if the bounded checks cannot establish the required evidence",
                 },
             )
         )
@@ -641,6 +659,7 @@ class BoardTests(BoardFixture):
 
     def test_wait_resume_requires_satisfying_event_and_keeps_deadline(self) -> None:
         self.ready()
+        self.initial_plan()
         self.send(
             self.message(
                 "question",

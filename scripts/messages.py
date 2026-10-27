@@ -12,7 +12,15 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any
 
-from settings import Settings, identifier, nonempty, require, strict_json
+from settings import (
+    COMPLETION_SCOPE,
+    INITIAL_PLAN_SCOPE,
+    Settings,
+    identifier,
+    nonempty,
+    require,
+    strict_json,
+)
 
 
 class Kind(StrEnum):
@@ -116,9 +124,17 @@ def validate_body(kind: Kind, body: Any, settings: Settings) -> None:
     """Check required fields, field types, and configured wait policy."""
     require(isinstance(body, dict), "body must be an object")
     fields = BODY_FIELDS[kind]
+    if kind == Kind.PROPOSE and isinstance(body.get("scope"), list):
+        if tuple(body["scope"]) == INITIAL_PLAN_SCOPE:
+            fields = fields | {"criteria", "stop_condition"}
+        elif tuple(body["scope"]) == COMPLETION_SCOPE:
+            fields = fields | {"gate", "evidence", "outcome", "effects"}
     require(
         fields <= set(body) <= fields | {"text", "artifacts"},
-        "body fields do not match act",
+        "body fields do not match act; missing: "
+        + ", ".join(sorted(fields - set(body)))
+        + "; unexpected: "
+        + ", ".join(sorted(set(body) - fields - {"text", "artifacts"})),
     )
     for name, value in body.items():
         if name in {"scope", "blocks", "criteria", "evidence"}:
@@ -162,6 +178,13 @@ def validate_body(kind: Kind, body: Any, settings: Settings) -> None:
                 )
         else:
             nonempty(value, name)
+            if name == "gate":
+                identifier(value, "completion gate agreement")
+            if name == "outcome":
+                require(
+                    value in {"complete", "incomplete"},
+                    "outcome must be complete or incomplete",
+                )
     if kind == Kind.READY:
         identifier(body["context_revision"], "context_revision")
 
