@@ -3,7 +3,7 @@
 ## Simple interface
 
 Both peers run persistent `/goal` loops. Duet coordinates their exchange; it does
-not supply the host loop or launch a peer. Run `python3 <skill>/scripts/duet.py`.
+not supply the host loop or launch a peer. Run `python3 -B <skill>/scripts/duet.py`.
 JSON goes to stdout and diagnostics to stderr. `--help` lists complete arguments.
 Users provide a task and optional output location/done criteria, not protocol IDs.
 Pass the shared task wording, without the CLI's leading `/goal` invocation token.
@@ -19,7 +19,7 @@ status only, without task analysis or writing task artifacts.
 ### Pair
 
 ```bash
-python3 <script> join --workspace <project> <<'TASK'
+python3 -B <script> join --workspace <project> <<'TASK'
 <unchanged request>
 TASK
 ```
@@ -27,6 +27,8 @@ TASK
 Join returns a short `connection` token plus its full `connection_path` fallback,
 `status` (waiting/paired), generated identities, `settings_path`, `board`, shared
 `temp_directory`, default `artifact_directory`, and initial/completion proposer.
+Host and user output limits override that default for all task artifacts, including
+scratch findings. If files are not permitted, share compact observations inline.
 Retain both connection forms. The opaque short token binds a specific actor and
 collaboration; it never means “latest session” or “this client's role.” Its lookup
 is in the caller's temporary root. If that root changes or the lookup disappears,
@@ -59,12 +61,17 @@ Paired sessions never expire. Silence and timeout do not prove process death.
 Keep the workspace path and lobby registry intact while a pair is active;
 removing discovery metadata or moving the workspace is not a session-resume mechanism.
 
-### Agree the completion gate before work
+### Define done before main work
+
+Apply the practical read-only scope below while negotiating the gate. Do not turn
+an ordinary read-only request into a no-new-files or no-checkout-writes condition.
+In particular, a supplied check that creates only new disposable runtime files may
+run after agreement without a special exemption or compulsory scratch copy.
 
 ```bash
-python3 <script> send --connection <handle> --kind ready --text 'Ready to negotiate.'
-python3 <script> send --connection <handle> --kind propose --scope work-division --criteria '<first done condition>' --criteria '<second done condition>' --stop-condition '<bounded unsuccessful-stop/reassessment rule>' --text '<scope, owners, user constraints, method, output, final writer>'
-python3 <script> send --connection <handle> --kind agree --reply-to <plan-id> --text '<explicit acceptance>'
+python3 -B <script> send --connection <handle> --kind ready --text 'Ready to negotiate.'
+python3 -B <script> send --connection <handle> --kind propose --scope work-division --criteria '<first done condition>' --criteria '<second done condition>' --stop-condition '<bounded unsuccessful-stop/reassessment rule>' --text '<scope, owners, user constraints, method, output, final writer>'
+python3 -B <script> send --connection <handle> --kind agree --reply-to <plan-id> --text '<explicit acceptance>'
 ```
 
 The initial proposer offers the plan after both readiness messages; the peer
@@ -74,35 +81,116 @@ agreement, not whether a criterion expresses the user's goal well. Preserve user
 criteria; derive faithful bounded criteria when the user supplies a broad goal.
 No user prompt boilerplate or separate gate-handshake phase is required.
 
-Only startup and negotiation precede agreement. Startup reads cover the skill,
-workspace rules, and user directives, not referenced task code, designs, evidence,
-or metadata. Reading those to prepare the plan is already task work. Investigation,
-substantive ideation, experiments, and editing wait. The utility
-rejects protocol task work and attachments before agreement; it cannot intercept
-native tools. An accepted gate already commits its bounded responsibilities.
-Filename-only discovery may locate instructions at startup; it does not authorize
-task-directed exploration or content searches across the project before agreement.
+User ordering takes precedence over the discovery default. “Agree before work”
+requires a gate before task metadata or content inspection, even when the quality
+criteria are broad. Reading governing instructions and coordination metadata is
+preparation unless forbidden. Agree a meaningful bounded gate from the request;
+it may authorize scoped inspection and subsequent bilateral refinement before the
+main investigation. “Decide done later” alone is not a completion criterion.
+For example, a read-only review can require coverage of the agreed change, supported
+findings, explicit validation limits and joint approval of the report, while the
+first authorized step identifies the revisions and refines coverage.
+
+Absent an agreement-first restriction, extract clear user completion conditions
+and agree them before investigation. If unclear, each peer after publishing ready
+may inspect within a stated finite read-only scope solely to define done. Use scoped
+helpers when useful; share provisional observations inline. Stop at the boundary
+and propose criteria or seek a narrow clarification. Discovery permits no execution
+of project code, edits, artifacts or full investigation. The utility keeps task
+lifecycle acts and capture behind the accepted gate; native inspection remains
+the agents' responsibility.
+
+Separate user requirements from peer-proposed process choices. Resolve ambiguity
+within the user's constraints, choosing a faithful interpretation that permits
+progress. If interpretations materially change permission or success and cannot
+be resolved, ask one focused user question; continue only work allowed under either.
+New process choices apply prospectively, not as invented historical obligations.
+When an earlier action raises a possible violation, distinguish the observed facts,
+the exact applicable instruction and the peers' interpretation; seek clarification
+once if it changes the disposition. Do not assume a waiver or conceal a real breach.
 If premature work occurred, disclose what happened to the peer before continuing.
 Agree how to reassess affected work within the user's constraints; peer consent
 cannot waive a user requirement. Preserve material deviations in the final report
 and never claim that later agreement preceded the earlier work.
 
-Amendments use the same work-division scope and carry full replacement criteria
-and stop condition. The utility adds the current agreement to causal references.
-Competing accepted amendments require a new proposal causally reconciling both,
-followed by explicit agreement. Peers may change their own process choices, not
-silently weaken user requirements. A superseded gate invalidates old completion
-consent even if report bytes are unchanged.
+Amendments use the same work-division scope and full replacement criteria and stop
+condition. Link earlier proposals with `--cause`, not `--reply-to`; the utility adds
+the accepted gate. State changed process choices and their reason, preserving user
+requirements. `status --connection` retains `user_request` and adds `gate_review`
+when needed: added/removed/reordered criteria, stopping/plan diffs, actual causal
+bases, and whether they match the current gate. Stale-base comparisons also show
+changes against the currently accepted gate. This view is read-only, not acknowledgment
+or proof that removed conditions may be waived. Review the exact proposal before assent.
+The initial proposer leads consolidation; either peer may challenge or counterpropose.
+Receive replies and inspect the accepted gate before replacing terms. Cite that
+gate when amending it. If acceptance crosses a replacement, withdraw the unsettled
+replacement or amend the accepted gate with fresh assent; do not request acceptance
+of both. If both were already accepted, reconcile those acceptances explicitly.
+This is coordination responsibility, not superior decision authority. Accepted
+peer-added rules also need bilateral amendment; do not silently discard them.
+Competing accepted amendments need explicit reconciliation. Incidents belong in alerts
+and completion evidence; cleanup never makes earlier noncompliance disappear.
+
+### Run project commands within constraints
+
+Interpret an unqualified read-only request practically: preserve source,
+configuration, project data, Git refs/staging and existing project files, including
+ignored outputs. Reports, scratch files, normal CLI state and disposable caches
+needed for authorized work are allowed. Prefer the shared temporary area outside
+the checkout. Necessary new disposable tooling files inside the checkout are also
+allowed; a cache label does not authorize overwriting a pre-existing `.coverage`
+or other project file. Normal client-owned state outside the project may follow
+its usual lifecycle within host permissions.
+
+Explicit restrictions such as “keep every file and directory unchanged” or “no
+writes inside the checkout” override this default. A report output path alone
+does not prohibit operational scratch elsewhere; an explicit output-only restriction
+does. This allowance changes neither gate ordering nor publication authority.
+During startup/discovery it permits operational files, not premature task deliverables
+or execution of project code.
+
+After the gate, inspect effective tool/project configuration before execution.
+Account for implicit reports, caches, generated files and subprocesses. Use permitted
+scratch storage, a copy or enforced isolation when appropriate; otherwise skip unsafe
+execution and retain any mandatory check as unmet. No flag list guarantees read-only work.
+For Python, `-I` ignores `PYTHON*` variables, including `PYTHONDONTWRITEBYTECODE`;
+explicit `-B` still suppresses import bytecode writes. Neither prevents other outputs.
+Pytest may inherit coverage/HTML options through `addopts` and create caches;
+inspect its effective configuration rather than trusting a short command line.
+Account for native command wrappers as well as project tools. New identifiable
+temporary scaffolding alone does not establish a read-only breach or require an
+incomplete outcome. Inspect unexpected changes and preserve consequential uncertainty;
+do not demand forensic proof that no temporary file ever existed. Do not delete
+unfamiliar files or bypass host permissions to manufacture a clean checkout.
+See [Python options](https://docs.python.org/3/using/cmdline.html#cmdoption-I),
+[pytest-cov configuration](https://pytest-cov.readthedocs.io/en/latest/config.html),
+and [pytest cache behavior](https://docs.pytest.org/en/stable/how-to/cache.html).
+
+If a command breaches a constraint, stop that operation and publish an `alert` with
+`--scope <affected-area>` and `--cause <related-message>` where useful. Distinguish
+what was written, what prior state is known, and what remains unverified; a current
+hash cannot prove no earlier file was overwritten. Recover only within user authority.
+Keep consequential uncertain effects recorded, and use criterion evidence to distinguish
+a finished deliverable from compliant execution. A mandatory condition still unmet
+requires an incomplete outcome unless the user explicitly changes the requirement.
+
+### Delegate without creating another peer
+
+Encourage scoped helpers for inspection, work slices and checks where they save
+context or improve coverage. Pass the objective, permitted inputs/actions, constraints
+and stopping boundary; ask for compact findings with evidence and uncertainty.
+Helpers do not join Duet, receive connection credentials or approve completion.
+Each peer validates helper output and retains responsibility for its own assessment.
 
 ### Exchange evidence and inspect state
 
 ```bash
-python3 <script> send --connection <handle> --text '<finding and uncertainty>' --artifact <file>
-python3 <script> receive --connection <handle> --unread
-python3 <script> send --connection <handle> --reply-to <message-id> --text '<substantive response>'
-python3 <script> ack --connection <handle> --messages <handled-id> <handled-id>
-python3 <script> status --connection <handle>
-python3 <script> wait --connection <handle>
+python3 -B <script> send --connection <handle> --text '<finding and uncertainty>' --artifact <file>
+python3 -B <script> receive --connection <handle> --unread
+python3 -B <script> send --connection <handle> --reply-to <message-id> --text '<substantive response>'
+python3 -B <script> ack --connection <handle> --messages <handled-id> <handled-id>
+python3 -B <script> status --connection <handle>
+python3 -B <script> wait --connection <handle>
 ```
 
 Normal sends/retries return compact receipts and captured artifact references.
@@ -149,7 +237,7 @@ is the approved deliverable; future origin edits do not approve new bytes.
 Only the completion proposer:
 
 ```bash
-python3 <script> complete --connection <handle> --propose --artifact <report> --text '<whole-goal claim>' --evidence '<evidence for first criterion>' --evidence '<evidence for second criterion>'
+python3 -B <script> complete --connection <handle> --propose --artifact <report> --text '<whole-goal claim>' --evidence '<evidence for first criterion>' --evidence '<evidence for second criterion>'
 ```
 
 Supply one nonempty evidence statement per effective gate criterion, in order.
@@ -169,8 +257,8 @@ a changed reported-effect context also makes a pending offer stale.
 The reviewer explicitly accepts or requests changes:
 
 ```bash
-python3 <script> complete --connection <handle> --agree <offer-id>
-python3 <script> complete --connection <handle> --request-changes <offer-id> --text '<correction or new evidence>'
+python3 -B <script> complete --connection <handle> --agree <offer-id>
+python3 -B <script> complete --connection <handle> --request-changes <offer-id> --text '<correction or new evidence>'
 ```
 
 A request produces an attention-bearing object before approval or alert afterward.
@@ -178,7 +266,7 @@ New content also interrupts a completion wait as changed context; it never count
 as approval. Use the correction helper to make the requested action explicit. The proposer uses:
 
 ```bash
-python3 <script> complete --connection <handle> --revise --artifact <report> --text '<reassessed whole-goal claim>' --evidence '<first criterion>' --evidence '<second criterion>'
+python3 -B <script> complete --connection <handle> --revise --artifact <report> --text '<reassessed whole-goal claim>' --evidence '<first criterion>' --evidence '<second criterion>'
 ```
 
 The helper performs any necessary withdrawal/alert and prepares a fresh offer.
@@ -208,6 +296,15 @@ explicitly agree. Terminal `status: incomplete` has `terminal: true` and `comple
 false`; do not mark the user's goal achieved. If the peer is known unavailable,
 report local incomplete work and seek a user decision; bilateral stop cannot invent
 the absent peer's assent. Ordinary waiting alone does not establish peer loss.
+
+After either joint terminal outcome, stop collaboration work. Deliver the approved
+artifacts and explain unmet conditions and any required user decision once. Follow
+the host's available goal statuses and their actual prerequisites: Duet's terminal
+incomplete is not host success, nor authority to pause or declare blocked early.
+If the host continues the goal, retain the terminal result and report the outstanding
+condition concisely; do not repeat finished checks, reopen negotiation automatically,
+or repeatedly ask for a waiver. New user instructions may require fresh work; they
+do not alter the closed board or its recorded outcome.
 
 ## Advanced acts and settings
 

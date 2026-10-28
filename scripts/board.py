@@ -399,7 +399,7 @@ def _publish(
     } or message.body.get("artifacts"):
         require(
             initial.agreement is not None and not initial.conflicted,
-            "agree completion criteria before substantive task work or attachments",
+            "agree completion criteria before main task lifecycle acts or attachments",
         )
     if message.kind == Kind.WITHDRAW and history[message.reply_to].kind == Kind.REQUEST:
         require(

@@ -46,7 +46,9 @@ Select both participating CLIs when prompted. The installer requires Node.js;
 2. **Start agent CLI 2.** Open a second terminal in the same project directory,
    launch the other CLI, and submit the **same `/goal` prompt**.
 3. **Let them work together.** Keep both goal loops running. The agents pair,
-   agree on their work, investigate, challenge findings, and write a joint report.
+   agree first when requested, otherwise inspect enough to define done when needed,
+   agree on their work, investigate,
+   challenge findings, and write a joint report.
    The first agent may wait while you start the second.
 4. **Read the report.** The collaboration finishes when both agents agree the
    shared task is complete. Find the report in the directory specified in your
@@ -61,11 +63,21 @@ sequenceDiagram
     participant B as Agent CLI 2
 
     You->>A: Start CLI 1 and submit a /goal prompt
-    Note right of A: Wait for the peer
+    Note right of A: Wait or perform permitted bounded discovery
     You->>B: Start CLI 2 and submit the same /goal prompt
     Note over A,B: Same project, both goal loops running
-    A->>B: Propose scope, done criteria, and work limits
-    B->>A: Agree on the plan
+    alt Agreement first requested or clear criteria supplied
+        A->>B: Propose a meaningful gate from the request
+    else Criteria need task inspection
+        par Bounded read-only discovery
+            A->>A: Inspect and propose what done means
+        and
+            B->>B: Inspect and propose what done means
+        end
+        A->>B: Propose task-specific criteria and work limits
+    end
+    B->>A: Agree or counterpropose, then reach consensus
+    Note over A,B: Scoped subagents may help; only these two peers grant consensus
 
     loop Until both agree the task is complete
         par Independent investigation
@@ -83,6 +95,12 @@ sequenceDiagram
     A-->>You: Review complete
     B-->>You: Review complete
 ```
+
+User instructions take precedence. If you ask the peers to agree before work, they
+agree before inspecting task metadata or content. Otherwise, an unclear goal allows
+bounded read-only discovery to define done. They refine criteria together as needed,
+preserve your requirements, and ask a focused question when ambiguity changes what
+they may do or what counts as success.
 
 <a id="example-instructions"></a>
 
@@ -147,12 +165,19 @@ advertises a fresh session; a fourth joins it. Both pairs may work simultaneousl
 even on the same task. Old paired sessions, whether completed or interrupted,
 never block new pairing. Each pair has its own board and generated credentials.
 
-Both peers announce readiness, then agree on scope, completion criteria, and a
-bounded stop/reassessment condition before investigating or doing other task work.
-They preserve user-supplied criteria or derive them from a broader goal. The same
+Both peers announce readiness. Explicit agreement-first instructions and clear user
+completion criteria go directly into agreement. Otherwise each peer inspects within a finite read-only
+discovery scope, independently proposes meaningful done conditions, then agrees
+on the gate. Discovery stops at its stated boundary and does not authorize edits,
+execution of project code or full investigation. Main work starts after agreement. The same
 opening establishes responsibilities, method, output location, and final writer;
 it needs no extra gate-negotiation phase. The peers then work, challenge claims,
 and review evidence using the method appropriate to the task.
+
+Scoped subagents are encouraged for reconnaissance, task slices, and independent
+checks when useful. Each peer gives narrow assignments and integrates compact,
+evidence-bearing results. Helpers never join the board, receive peer credentials,
+replace either independently started peer, or grant final approval.
 
 Routine conversation uses plain text. The utility constructs envelopes, retains
 retry IDs, captures artifact bytes and digests, and derives reply references.
@@ -166,6 +191,13 @@ cannot be met, peers may agree an explicitly incomplete outcome; reaching a work
 limit never turns failure into success.
 
 ## 💾 Storage and limits
+
+**Read-only reviews allow normal temporary activity.** Duet protects project
+content, Git refs/staging and existing files, including ignored files. Reports,
+scratch files, CLI state and disposable caches are permitted; prefer storage outside
+the checkout. Necessary new temporary tooling files inside it are allowed without
+overwriting existing files or changing project content. Explicit stricter instructions
+and host permissions still apply.
 
 The first advertiser uses an existing `$TMPDIR`, otherwise Python's
 `tempfile.gettempdir()`. Its invitation records an absolute board path, which the

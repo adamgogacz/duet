@@ -109,6 +109,74 @@ class InteractionFixture(BoardFixture):
 class ActionTests(InteractionFixture):
     """Protect retry, artifact, and processing semantics while removing manual fields."""
 
+    def test_proposal_reply_error_points_to_causes_without_creating_artifacts(
+        self,
+    ) -> None:
+        self.plan()
+        original = send(
+            self.peers[0], Kind.PROPOSE, text="Initial decision", scope=["approach"]
+        )
+        with self.assertRaisesRegex(DuetError, r"propose.*--cause.*--reply-to"):
+            send(
+                self.peers[1],
+                Kind.PROPOSE,
+                reply_to=original["id"],
+                text="Counterproposal",
+                scope=["approach"],
+                artifacts=[self.report],
+            )
+        self.assertFalse((self.peers[0].settings.board / "artifacts").exists())
+        counter = send(
+            self.peers[1],
+            Kind.PROPOSE,
+            causes=[original["id"]],
+            text="Counterproposal",
+            scope=["approach"],
+        )
+        self.assertIn(original["id"], counter["message"]["causes"])
+
+    def test_alert_scope_error_is_actionable_and_does_not_publish(self) -> None:
+        self.plan()
+        before = len(scan(self.peers[0].settings).messages)
+        with self.assertRaisesRegex(DuetError, r"alert requires --scope.*--cause"):
+            send(
+                self.peers[0],
+                Kind.ALERT,
+                text="Unexpected output",
+                artifacts=[self.report],
+            )
+        self.assertEqual(len(scan(self.peers[0].settings).messages), before)
+        self.assertFalse((self.peers[0].settings.board / "artifacts").exists())
+        alert = send(
+            self.peers[0],
+            Kind.ALERT,
+            text="Unexpected output",
+            body={"scope": ["read-only"]},
+        )
+        self.assertEqual(alert["message"]["body"]["scope"], ["read-only"])
+
+    def test_initiating_reply_cli_error_gives_the_permitted_form(self) -> None:
+        self.plan()
+        proposal = send(
+            self.peers[0], Kind.PROPOSE, scope=["approach"], text="Approach"
+        )
+        result = self.cli(
+            1,
+            "send",
+            "--kind",
+            "propose",
+            "--reply-to",
+            proposal["id"],
+            "--scope",
+            "approach",
+            "--text",
+            "New proposal",
+        )
+        self.assertEqual(result.returncode, ExitCode.ERROR)
+        error = json.loads(result.stderr)
+        self.assertIn("--cause", error["message"])
+        self.assertIn("agree/object", error["message"])
+
     def test_counterplan_gets_its_required_causal_link_without_an_envelope(
         self,
     ) -> None:

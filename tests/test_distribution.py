@@ -119,12 +119,11 @@ class DistributionTests(unittest.TestCase):
         self.assertFalse((self.installed / "docs").exists())
         self.assertFalse((self.installed / ".git").exists())
 
-    def test_installed_skill_is_concise_licensed_and_self_contained(self) -> None:
+    def test_installed_skill_is_licensed_and_self_contained(self) -> None:
+        """Validate shipped metadata, license, and bundled references."""
         manifest = (self.installed / "SKILL.md").read_text()
         self.assertIn("name: duet\n", manifest)
         self.assertIn("license: Apache-2.0\n", manifest)
-        self.assertLess(len(manifest.splitlines()), 100)
-        self.assertLess(len(manifest.split()), 1000)
         self.assertIn("Apache License", (self.installed / "LICENSE").read_text())
         for target in re.findall(r"\]\(([^)]+)\)", manifest):
             if not target.startswith(("https://", "http://", "#")):

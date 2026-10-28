@@ -36,6 +36,7 @@ class NativeCall:
     id: str
     tool: str
     arguments: Mapping[str, Any]
+    parent: str | None = None
 
 
 def native_calls(streams: Sequence[Sequence[dict[str, Any]]]) -> tuple[NativeCall, ...]:
@@ -54,11 +55,13 @@ def native_calls(streams: Sequence[Sequence[dict[str, Any]]]) -> tuple[NativeCal
                     block.get("id", ""),
                     block.get("name", ""),
                     block.get("input", {}),
+                    row.get("parent_tool_use_id"),
                 )
                 if (
                     not call.session
                     or not call.id
                     or not isinstance(call.arguments, dict)
+                    or (call.parent is not None and not isinstance(call.parent, str))
                 ):
                     raise ValueError("Native tool call lacks its identity or input")
                 key = (call.session, call.id)
@@ -66,6 +69,43 @@ def native_calls(streams: Sequence[Sequence[dict[str, Any]]]) -> tuple[NativeCal
                     raise ValueError("Native tool call changed under an existing ID")
                 calls[key] = call
     return tuple(calls.values())
+
+
+def helper_lineage(
+    calls: Sequence[NativeCall], audits: Sequence[dict[str, Any]], helper: str
+) -> bool:
+    """Bind each observed helper to its root launch, type, and restricted tool pool."""
+    by_id = {(call.session, call.id): call for call in calls}
+    observed = {
+        (item.get("session_id"), item.get("tool_use_id")): item for item in audits
+    }
+    identities: dict[tuple[str, str], str] = {}
+    for call in calls:
+        audit = observed.get((call.session, call.id), {})
+        if call.parent is None:
+            if audit.get("agent_id"):
+                return False
+            if call.tool == "Agent" and call.arguments.get("subagent_type") != helper:
+                return False
+            continue
+        launcher = by_id.get((call.session, call.parent))
+        identity = audit.get("agent_id")
+        if (
+            launcher is None
+            or launcher.parent is not None
+            or launcher.tool != "Agent"
+            or launcher.arguments.get("subagent_type") != helper
+            or call.tool not in {"Read", "Grep", "Glob"}
+            or not isinstance(identity, str)
+            or not identity
+            or audit.get("agent_type") != helper
+        ):
+            return False
+        key = (call.session, call.parent)
+        if key in identities and identities[key] != identity:
+            return False
+        identities[key] = identity
+    return True
 
 
 def audit_complete(
@@ -82,9 +122,9 @@ def audit_complete(
             or call is None
             or key in observed
             or item.get("tool") != call.tool
+            or not isinstance(item.get("cwd"), str)
             or item.get("input_digest") != input_digest(call.arguments, item.get("cwd"))
             or type(item.get("time_ns")) is not int
-            or not isinstance(item.get("cwd"), str)
         ):
             return False
         observed.add(key)
@@ -108,16 +148,13 @@ def script_command(command: str) -> tuple[str, str]:
 
 
 def task_tool(record: Mapping[str, Any]) -> bool:
-    """Include unscoped content searches and task-targeted filename searches."""
+    """Track task content, execution and artifacts separately from filename lookup."""
+    if record.get("tool") == "Glob":
+        return False
     path = str(record.get("file_path") or "")
     parts = Path(path).parts
     if set(parts) & {"inputs", "output"} or Path(path).name == "case_checks.py":
         return True
-    if record.get("tool") == "Glob":
-        # A filename-only instruction locator is not evidence of reading task content.
-        return bool(
-            set(Path(str(record.get("pattern") or "")).parts) & {"inputs", "output"}
-        )
     if record.get("tool") == "Grep":
         if ".claude" in parts and "skills" in parts:
             return False
@@ -135,22 +172,52 @@ def task_tool(record: Mapping[str, Any]) -> bool:
     return Path(script).name == "case_checks.py"
 
 
-def joined_participants(
+def file_tools_scoped(
+    audits: Sequence[Mapping[str, Any]], workspace: Path, temporary: Path
+) -> bool:
+    """Check explicit native file operations against the evaluation reading/writing areas."""
+    roots = (workspace.resolve(), temporary.resolve())
+    for item in audits:
+        tool = item.get("tool")
+        if tool not in {"Read", "Grep", "Glob", "Write", "Edit"}:
+            continue
+        raw = item.get("file_path") or "."
+        if not isinstance(raw, str):
+            return False
+        if tool == "Glob":
+            pattern = item.get("pattern")
+            if not isinstance(pattern, str) or ".." in Path(pattern).parts:
+                return False
+            raw = os.path.join(raw, pattern)
+        try:
+            target = (Path(item.get("cwd") or workspace) / raw).resolve()
+        except (TypeError, ValueError, OSError, RuntimeError):
+            return False
+        if tool in {"Write", "Edit"}:
+            if not target.is_relative_to(roots[0] / "output"):
+                return False
+        elif not any(target.is_relative_to(root) for root in roots):
+            return False
+    return True
+
+
+def validated_joins(
     streams: Sequence[Sequence[dict[str, Any]]],
     calls: Sequence[NativeCall],
     members: Iterable[Mapping[str, Any]],
     script: Path,
-) -> dict[str, str]:
-    """Bind native sessions through successful join results checked against enrollment."""
+) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    """Return root join results whose actor credentials match actual enrollment."""
     joins = {
         (call.session, call.id): call
         for call in calls
         if call.tool == "Bash"
+        and call.parent is None
         and script_command(str(call.arguments.get("command", "")))
         == (str(script), "join")
     }
     enrolled = {(member["participant"], member["session"]) for member in members}
-    participants: dict[str, set[tuple[str, str]]] = {}
+    results: dict[tuple[str, str], Mapping[str, Any]] = {}
     for stream in streams:
         for row in stream:
             message = row.get("message")
@@ -182,11 +249,94 @@ def joined_participants(
                     continue
                 actor = (result.get("participant"), result.get("session"))
                 if actor in enrolled:
-                    participants.setdefault(key[0], set()).add(actor)
+                    results[key] = result
+    return tuple((session, result) for (session, _), result in results.items())
+
+
+def joined_participants(
+    streams: Sequence[Sequence[dict[str, Any]]],
+    calls: Sequence[NativeCall],
+    members: Iterable[Mapping[str, Any]],
+    script: Path,
+) -> dict[str, str]:
+    """Bind native sessions through successful join results checked against enrollment."""
+    participants: dict[str, set[tuple[str, str]]] = {}
+    for session, result in validated_joins(streams, calls, members, script):
+        participants.setdefault(session, set()).add(
+            (result["participant"], result["session"])
+        )
     return {
         session: next(iter(actors))[0]
         for session, actors in participants.items()
         if len(actors) == 1
+    }
+
+
+def helper_credentials_isolated(
+    streams: Sequence[Sequence[dict[str, Any]]],
+    calls: Sequence[NativeCall],
+    members: Sequence[Mapping[str, Any]],
+    script: Path,
+    workspace: Path,
+) -> bool:
+    """Keep enrolled actor capabilities out of helper prompts and file-tool scope."""
+    capabilities = {
+        member["session"]
+        for member in members
+        if isinstance(member.get("session"), str)
+    }
+    for _, result in validated_joins(streams, calls, members, script):
+        capabilities.update(
+            result[field]
+            for field in ("connection", "connection_path")
+            if isinstance(result.get(field), str) and result[field]
+        )
+    for call in calls:
+        if call.tool == "Agent":
+            arguments = json.dumps(call.arguments, ensure_ascii=False)
+            if any(
+                capability and capability in arguments for capability in capabilities
+            ):
+                return False
+        if call.parent is not None:
+            raw = call.arguments.get("file_path", call.arguments.get("path", ""))
+            if isinstance(raw, str):
+                try:
+                    resolved = (workspace / raw).resolve()
+                except (OSError, ValueError, RuntimeError):
+                    return False
+                pattern = str(call.arguments.get("pattern") or "")
+                if (
+                    "connections" in Path(raw).parts
+                    or "connections" in resolved.parts
+                    or "connections" in Path(pattern).parts
+                ):
+                    return False
+    return True
+
+
+def helper_task_path(call: NativeCall, workspace: Path) -> bool:
+    """Allow fixture inputs, supplied measurement source and named root instructions."""
+    root = workspace.resolve()
+    raw = call.arguments.get("file_path", call.arguments.get("path"))
+    if raw is not None and not isinstance(raw, str):
+        return False
+    if call.tool == "Glob":
+        pattern = call.arguments.get("pattern")
+        if not isinstance(pattern, str) or not pattern:
+            return False
+        raw = os.path.join(raw or ".", pattern)
+    if not isinstance(raw, str) or not raw or "connections" in Path(raw).parts:
+        return False
+    try:
+        target = (root / raw).resolve()
+    except (ValueError, OSError):
+        return False
+    return target.is_relative_to(root / "inputs") or target in {
+        root / "TASK.md",
+        root / "AGENTS.md",
+        root / "CLAUDE.md",
+        root / "case_checks.py",
     }
 
 

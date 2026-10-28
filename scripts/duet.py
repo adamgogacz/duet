@@ -80,10 +80,16 @@ def parser() -> argparse.ArgumentParser:
         "--kind", choices=[kind.value for kind in Kind], default=Kind.INFORM.value
     )
     sending.add_argument("--text", help="Substantive text; use - for UTF-8 stdin")
-    sending.add_argument("--reply-to", help="Message being answered or reviewed")
+    sending.add_argument(
+        "--reply-to", help="Reply target; new proposals and alerts use --cause instead"
+    )
     sending.add_argument("--subject-type", choices=sorted(SUBJECT_TYPES))
     sending.add_argument("--subject-id")
-    sending.add_argument("--scope", nargs="+")
+    sending.add_argument(
+        "--scope",
+        nargs="+",
+        help="Affected scope; required for proposals, requests and alerts unless supplied in --body",
+    )
     sending.add_argument("--criteria", action="append")
     sending.add_argument("--evidence", action="append")
     sending.add_argument(
@@ -96,7 +102,12 @@ def parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional semantic body fields for advanced acts; never an envelope",
     )
-    sending.add_argument("--cause", action="append", default=[])
+    sending.add_argument(
+        "--cause",
+        action="append",
+        default=[],
+        help="Link prior evidence or a replaced proposal without turning an initiating act into a reply",
+    )
     sending.add_argument("--dry-run", action="store_true")
     sending.add_argument(
         "--details",

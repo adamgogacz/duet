@@ -39,8 +39,10 @@ case for a meaningful protocol or concurrency failure. Use independent processes
 when testing filesystem coordination, and controlled clocks for deadline logic.
 Never run tests against a user's real collaboration board.
 
-Keep SKILL.md short. It should tell an agent what to do and when to load a bundled
-reference. Put mechanical work in scripts and uncommon details in references.
+Keep SKILL.md concise, readable, and instructive. Remove repetition and unnecessary
+prose without sacrificing necessary rules or explanations; do not impose arbitrary
+line or word limits. Tell agents what to do and when to load a bundled reference.
+Put mechanical work in scripts and uncommon details in references.
 Maintain the README quick start and utility/protocol contracts together.
 
 Preserve these invariants:

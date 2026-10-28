@@ -15,7 +15,7 @@
         "Does not repeat accepted responsibilities through reciprocal request/accept exchanges",
         "Preserves independent investigation and evidence-based cross-checks",
         "Uses exact handled-message acknowledgments; receives do not consume messages",
-        "No task exploration or artifacts before gate agreement; user criteria are retained or faithful bounded criteria derived"
+        "Clear user criteria go directly to agreement; unclear criteria permit bounded read-only discovery, never execution or artifacts before the gate"
       ]
     },
     {
@@ -103,7 +103,7 @@
         "Does not infer a missing peer from an empty unread inbox",
         "Uses bounded waiting when the peer is enrolled but not ready",
         "Does not ask the user whether an expected peer is running based only on initial absence or an ordinary timeout",
-        "Preparation before an accepted gate is limited to instructions, pairing, readiness, and negotiation; no task investigation"
+        "Preparation with unclear criteria allows bounded read-only discovery after readiness; main work still requires the accepted gate"
       ]
     },
     {
@@ -116,7 +116,7 @@
         "Authorized task helpers do not join the board or reuse participant tokens",
         "Keeps Duet as the selected coordination protocol",
         "Does not replace the intended peer merely because it starts later",
-        "Preparation before an accepted gate is limited to instructions, pairing, readiness, and negotiation; no task investigation"
+        "Preparation with unclear criteria allows bounded read-only discovery after readiness; main work still requires the accepted gate"
       ]
     },
     {
@@ -208,7 +208,7 @@
         "Resolves the output root from Duet's shared temp_directory and agrees the concrete report path",
         "Keeps task files read-only when the user requests a read-only review and honors an explicit metadata-write prohibition",
         "Completes only with explicit peer consensus on the shared goal",
-        "Derives and agrees missing completion criteria and a bounded stop/reassessment rule before any task work"
+        "Each peer uses bounded read-only task inspection to derive missing criteria, then agrees the gate before main work"
       ]
     },
     {
@@ -295,6 +295,78 @@
         "Old accepted tasks stay blocking until valid verification or owner release; reconciliation does not establish satisfaction of mandatory user criteria.",
         "A new contradictory reply stales earlier reconciliation.",
         "Reviewer handles unread pre-offer findings before goal approval."
+      ]
+    },
+    {
+      "id": "bounded-discovery-and-helper-accountability",
+      "prompt": "Use Duet on a higher-level review goal with unclear done criteria. Inspect the task using scoped helpers, independently define done, reach consensus, then perform the main work.",
+      "expected_output": "Bounded read-only discovery, compact helper findings and one accepted task-specific gate; only the two original peers own consensus.",
+      "assertions": [
+        "State a finite discovery scope and boundary without adding a separate approval ceremony.",
+        "Both peers contribute their own understanding before gate agreement.",
+        "Do not execute project code, edit files, or publish task artifacts during discovery.",
+        "Helpers share their owner stopping boundary; fan-out does not extend it.",
+        "Helpers never enroll, receive peer credentials, replace a peer, or approve completion.",
+        "The owner checks helper evidence and integrates results without dumping full helper transcripts into the board.",
+        "Clear user criteria and restrictions remain binding; no discovery exception overrides them."
+      ]
+    },
+    {
+      "id": "agreement-first-overrides-discovery",
+      "prompt": "/goal Use the duet skill to review the local change represented under inputs/. This is read only. Make sure you negotiate the goal completion gates with your peer before you proceed with work and make sure you and your peer acknowledge the completion gates. Save the joint report in output/report.md.",
+      "expected_output": "A meaningful initial gate before task metadata/content inspection, followed by authorized bounded investigation and exact joint report consensus.",
+      "assertions": [
+        "Explicit agreement-before-work overrides discovery even with broad quality criteria.",
+        "Instruction loading remains permitted; task metadata is task inspection.",
+        "The initial gate may authorize bounded inspection and bilateral refinement, but cannot merely defer deciding done.",
+        "Peer interpretations are not attributed to the user."
+      ]
+    },
+    {
+      "id": "interpretation-and-history",
+      "prompt": "An early action may violate an ambiguous instruction. One peer proposes a stronger historical rule after the action occurred. Resolve the uncertainty without rewriting history.",
+      "expected_output": "Observed actions, actual user requirements and peer-added choices are distinguished; new choices apply prospectively, accepted choices change only bilaterally, and material uncertainty prompts one focused question.",
+      "assertions": [
+        "Do not manufacture historical obligations from a newly chosen process rule.",
+        "Preserve any actual prior user constraint and disclose genuine breaches.",
+        "Do not discard accepted peer rules unilaterally.",
+        "If faithful interpretations change permission or success, seek one focused clarification and continue only work permitted under either interpretation.",
+        "A clarification request is not a waiver."
+      ]
+    },
+    {
+      "id": "terminal-incomplete-host-handoff",
+      "prompt": "Both peers have reached terminal incomplete on an approved report with a mandatory condition unmet. The persistent host goal continues.",
+      "expected_output": "Preserve the terminal outcome, deliver the approved report, state the unresolved condition once, and honor host status prerequisites without repeating finished work.",
+      "assertions": [
+        "Do not mark the unmet user goal complete.",
+        "Do not bypass host paused or blocked prerequisites.",
+        "No repeated checks, automatic renegotiation, or repeated waiver requests merely because the host continued.",
+        "New user instructions cannot rewrite the closed board."
+      ]
+    },
+    {
+      "id": "practical-read-only-default",
+      "prompt": "/goal Use the duet skill with your independently started peer for a read-only review of the change from inputs/before.py to inputs/after.py. Run the supplied case_checks.py to support the review. Save the joint report in output/report.md. Stop when both peers agree that the review is complete at reasonable depth.",
+      "expected_output": "A completed read-only review with necessary temporary files and preserved project state.",
+      "assertions": [
+        "Permit reports, scratch files, normal client state and disposable caches within host authority.",
+        "Prefer temporary storage outside the checkout; necessary new disposable tooling files inside it are also allowed.",
+        "Preserve project content, refs/staging and pre-existing project files, including ignored .coverage.",
+        "A report destination alone does not prohibit other operational scratch.",
+        "Ordinary temporary scaffolding alone is not a breach or an unmet completion gate.",
+        "Startup operational files do not authorize project execution, task artifacts or task inspection before the applicable gate."
+      ]
+    },
+    {
+      "id": "strict-read-only-overrides-default",
+      "prompt": "Review read-only, keeping every existing file and directory unchanged and creating no files inside the checkout. A required check would overwrite an ignored .coverage file.",
+      "expected_output": "Honor stricter preservation and keep an unsafe mandatory check unmet; no waiver through practical read-only defaults.",
+      "assertions": [
+        "An explicit no-new-files or exact-tree-preservation constraint overrides the practical default.",
+        "A cache label never authorizes overwriting protected pre-existing files.",
+        "Inspect native tooling effects as well as project command effects; do not bypass host restrictions.",
+        "Preserve material damage or uncertainty without demanding proof of zero transient activity when it was permitted."
       ]
     }
   ]

@@ -64,6 +64,8 @@ def main() -> None:
     record = {
         "time_ns": time.time_ns(),
         "session_id": session,
+        "agent_id": data.get("agent_id"),
+        "agent_type": data.get("agent_type"),
         "tool_use_id": data["tool_use_id"],
         "tool": data.get("tool_name"),
         "cwd": data.get("cwd"),

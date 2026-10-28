@@ -16,6 +16,7 @@ from board import scan
 from delivery import Clock, SystemClock, acknowledge, receive, wait_for_messages
 from enrollment import find_run, finish, terminal_result
 from messages import Kind, Message
+from planning import gate_review
 from settings import COMPLETION_SCOPE, DuetError, ExitCode, require, strict_json
 from startup import ancestry, opening
 from workflow import (
@@ -81,17 +82,22 @@ def state(connection: Connection) -> dict[str, Any]:
             verify(settings, reference)
         return {
             **terminal_result(run),
+            "user_request": run.task,
             "artifacts": list(offer.body.get("artifacts", [])),
             "next_actions": ["report the outcome and stop this collaboration"],
         }
     result: dict[str, Any] = {
         "goal": settings.goal,
+        "user_request": run.task,
         "terminal": False,
         "complete": False,
         "recognized_obligations": obligations(snapshot),
         "reconciled_conflicts": reconciled_conflicts(snapshot),
         "unread_count": len(receive(settings, connection.participant).unread),
     }
+    planning = gate_review(settings, snapshot)
+    if planning is not None:
+        result["gate_review"] = planning
     try:
         current = gate(settings, snapshot)
     except DuetError:

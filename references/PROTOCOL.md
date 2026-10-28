@@ -14,10 +14,14 @@ Users provide task content and optional output/completion criteria. Peers derive
 faithful bounded completion criteria when the user supplies only a higher-level goal.
 Participants handle generated IDs, registry files, and shared-path resolution.
 Invoking Duet permits its coordination metadata unless the user explicitly forbids
-those writes; a read-only task keeps task content read-only. For shared output paths,
+those writes; read-only work uses the practical default below. For shared output paths,
 `$TMPDIR` refers to the advertiser's returned temporary root, not separate client
 environments. Participants agree the concrete report location, respecting any
 explicitly named file and separating concurrent outputs within supplied directories.
+When negotiating an ordinary read-only task, peers MUST apply the practical scope
+in section 7 rather than add no-new-files or no-checkout-writes requirements on
+the user's behalf. A check that only creates new disposable runtime files remains
+eligible after gate agreement; it does not require a special waiver or scratch copy.
 
 Both task prompts MUST start with `/goal`. The goal loop keeps each participant
 iterating across turns, peer replies, and bounded waits until joint consensus.
@@ -73,13 +77,27 @@ isolate project-file edits.
 Both participants MUST independently publish ready with the same context revision.
 Enrollment and readiness are different facts; an empty inbox or normal wait
 timeout does not establish a failed peer launch. Joint work acts require both
-readiness messages. Before an accepted gate, only instructions, pairing, readiness,
-and negotiation are permitted. Task metadata/diff inspection, research, substantive
-ideation, experiments, and edits MUST wait. Native tools remain outside the
-utility's enforcement boundary.
-Instruction reads mean skill/rules and user directives. Referenced task code,
-documents, designs, and evidence MUST NOT be read before gate agreement, even
-to prepare the plan. Load the skill before requesting those files.
+readiness messages. Load the skill and user directives before content inspection.
+Narrow filename lookup within permitted areas may locate instructions and inputs
+at startup; it is not task-content discovery. Join before inspecting contents.
+User ordering overrides the discovery default: an instruction to agree before work
+requires an accepted gate before task metadata or content inspection, even when
+quality criteria are broad. Governing instructions and permitted coordination
+metadata remain readable. Negotiate meaningful completion criteria and a stopping
+bound from the request; that gate MAY authorize bounded inspection and later
+bilateral refinement before main investigation. A placeholder to decide done later
+is not a completion gate.
+Otherwise, when user completion conditions are clear, peers extract and agree them
+before investigation. When conditions are unclear, each peer MAY, after publishing ready,
+perform bounded read-only discovery solely to understand the task and independently
+propose meaningful done conditions. State a finite scope and stopping boundary in
+normal conversation; helpers share that boundary. No extra discovery agreement is
+required. User restrictions on inspection remain binding. Stop discovery when criteria
+can be proposed or its boundary is reached; unresolved material ambiguity requires
+a narrow clarification rather than indefinite investigation.
+Discovery uses native reads and inline observations, not execution of project code, edits,
+task artifacts or full investigation. Main work and task lifecycle acts still require
+the accepted gate; native tools remain outside the utility's enforcement boundary.
 A failed or denied coordination command MUST NOT waive this restriction or
 authorize a solo task report. Diagnose the specific operation without evading
 permissions. If coordination remains unavailable, report startup status to the
@@ -87,9 +105,19 @@ user without substantive analysis or task artifacts. Premature work MUST be
 disclosed to the peer and assessed under the user's constraints; subsequent
 agreement MUST NOT be represented as preceding that work or satisfying an unmet
 user condition. Material deviations remain part of the outcome's limitations.
+Participants MUST distinguish user requirements from peer-proposed process choices.
+New process choices apply prospectively and MUST NOT manufacture obligations about
+past events. Preserve actual prior user constraints and incident history. If faithful
+interpretations still materially differ on permission or success, ask one focused
+user question and continue only work permitted under either interpretation.
 Peer-a proposes the initial-plan decision for that context revision, with exactly
 the work-division scope and both readiness messages in its causal ancestry. The
 peer agrees or counterproposes. Counterplans cite the opening and retain its scope.
+The initial proposer leads consolidation without superior decision authority.
+Receive replies and inspect the accepted gate before replacing terms; amendments
+cite that gate. When acceptance crosses a replacement, withdraw the unsettled
+replacement or amend the accepted gate. Competing acceptances require explicit
+reconciliation; never request redundant acceptance just to settle a crossed exchange.
 
 The opening MUST carry nonempty completion `criteria` and a `stop_condition`,
 and record scope, owners, user constraints, collaboration method, artifact location,
@@ -101,7 +129,10 @@ replace the requested outcome with an easier deliverable. Material ambiguity abo
 scope or user-reserved authority requires user input. Its acceptance establishes those commitments;
 participants MUST NOT repeat the same responsibilities through reciprocal task
 requests. New or changed commitments require new agreement. Gate amendments include full
-replacement criteria and a stop condition. Competing accepted amendments require
+replacement criteria and a stop condition, and explain changed process choices and
+why they change. Original user requirements remain binding unless the user explicitly
+changes them. Derived comparisons expose changes and stale bases but do not judge
+semantic adequacy; an incident must not be relabeled as compliance by amendment. Competing accepted amendments require
 explicit causal reconciliation, never arrival-order selection. Only user-reserved
 choices or missing external prerequisites warrant user intervention; ordinary
 partitioning, feedback, and waiting are peer responsibilities.
@@ -302,9 +333,26 @@ processing, not an exclusive OS file lock.
 
 Peer agreement never grants authority reserved to the user. Publishing, deploying,
 destructive operations, or external messages require the authority already supplied
-by the user/environment. Task helpers, when separately authorized, MUST NOT occupy
-a participant slot or reuse a participant's connection. A collaboration request
-alone never authorizes launching the other peer.
+by the user/environment. Scoped helpers are encouraged for bounded discovery,
+task slices and independent checks when useful within that authority. Give them
+narrow inputs, allowed actions, constraints and a stopping boundary; request compact
+findings with locations, evidence, checks and uncertainty. Helpers MUST NOT enroll,
+receive peer credentials, replace a peer or approve the collaboration. Owners validate
+and integrate their results; delegation is not verification or a second peer's judgment.
+A collaboration request alone never authorizes launching the other peer.
+
+Unless the user explicitly requires stricter preservation, read-only work MUST
+preserve project content, Git refs/staging and existing project files, including
+ignored files. It MAY create reports, scratch files, client state and disposable
+caches for authorized work, preferably outside the checkout. Necessary new disposable
+tooling files inside the checkout are permitted if they do not overwrite existing
+files or alter project content. Normal client-owned state outside the project may
+follow its usual lifecycle within host permissions. Explicit host restrictions and
+user constraints take precedence; a report destination alone is not an output-only
+restriction. Operational files do not authorize pre-gate task work or publication.
+Peers SHOULD check protected state and investigate unexpected changes; they MUST NOT
+invent a zero-filesystem-write requirement or treat ordinary temporary scaffolding
+alone as a breach. Actual damage and consequential uncertainty remain reportable.
 
 ## 8. Durable memory
 
@@ -343,9 +391,11 @@ latency. Check pairing/readiness before making a peer-absence claim.
 ## 10. Ordinary exchange
 
 1. Two agents pair and independently send ready.
-2. Peer-a proposes owners, scope, criteria, artifact paths, final writer, and
-   completion proposer. Peer-b agrees or counterproposes.
-3. Only after gate agreement, both investigate or ideate using the chosen method,
+2. Honor agreement-first instructions or extract clear user criteria directly.
+   Otherwise each peer performs bounded read-only discovery and proposes meaningful
+   done conditions, optionally using scoped helpers. Peer-a proposes the gate and responsibilities; peer-b assesses
+   it against its own understanding and agrees or counterproposes.
+3. After gate agreement, both pursue the main investigation or implementation,
    exchange evidence and uncertainty, and challenge consequential claims. The accepted plan requires no redundant task handshakes.
 4. One assembles the report and the other reviews captured revisions. Corrections
    receive evidence-based review.
@@ -361,6 +411,10 @@ one evidence statement per criterion and exact final artifact revisions. The pee
 reviews and explicitly agrees or requests changes. No user criterion is waived
 by labeling missing verification a limitation. An uncertainty assessment may
 legitimately conclude “unresolved”; a required proof or implementation may not.
+Deliverable completion, constraint compliance and unknown prior state are distinct.
+Recovery may contain damage without proving the original state was preserved or
+undoing a historical breach. Use existing alerts, criterion evidence and reported
+uncertain effects to retain these distinctions; peer assent is not user authority.
 
 Successful completion requires legitimate dispositions for recognized commitments,
 released or withdrawn completion-blocking waits, and no unresolved journal errors,
@@ -398,6 +452,13 @@ pretending unfinished work was verified. A known unavailable peer cannot supply
 bilateral consent: report local incomplete work and seek a user decision without
 inventing approval or silently assuming an identity. Ordinary silence or timeouts
 alone do not establish peer loss. No gate promises eventual success or peer return.
+
+Either terminal outcome ends collaboration work. Deliver the approved artifacts,
+unmet conditions and any needed user decision once. Host goal-status policies remain
+binding: terminal incomplete MUST NOT be reported as goal success or used to bypass
+host blocked/pause prerequisites. Host continuations retain the terminal result;
+they do not authorize repeated finished work, automatic renegotiation or repeated
+waiver requests. New user instructions do not rewrite the closed history.
 
 After successful joint completion, stop editing the approved output. Its captured
 revision remains authoritative independently of later origin edits or processing

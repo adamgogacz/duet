@@ -1237,3 +1237,45 @@ class WorkflowTests(InteractionFixture):
         self.assertTrue({branch["id"] for branch in branches} <= set(message.causes))
         self.assertEqual(ancestry(message.causes, before.history), set(before.history))
         self.assertEqual(self.close(offered)["status"], "complete")
+
+    def test_gate_amendment_does_not_clear_an_uncertain_execution_incident(
+        self,
+    ) -> None:
+        from board import save_checkpoint
+
+        self.plan()
+        self.handled(0)
+        peer = self.peers[0]
+        data = dict(receive(peer.settings, peer.participant).checkpoint)
+        data["external_actions"] = [
+            {
+                "id": "coverage-write",
+                "status": "uncertain",
+                "summary": "Cleanup did not establish whether a prior coverage file was overwritten",
+            }
+        ]
+        save_checkpoint(peer.settings, peer.participant, peer.session, encoded(data))
+        amendment = send(
+            peer,
+            Kind.PROPOSE,
+            scope=["work-division"],
+            criteria=["Write the final report"],
+            stop_condition="Stop incomplete if mandatory conditions remain unmet",
+            text="Changed reporting process; this cannot erase the execution incident",
+        )
+        send(self.peers[1], Kind.AGREE, reply_to=amendment["id"])
+        self.handled(0)
+        result, code = self.act(
+            0, propose=True, text="Report finished", evidence=["Report exists"]
+        )
+        self.assertEqual(code, ExitCode.ATTENTION)
+        self.assertEqual(result["status"], "blocked")
+        self.assertTrue(
+            any(
+                item["kind"] == "recorded-effect" and item["state"] == "uncertain"
+                for item in result["blockers"]
+            )
+        )
+        self.assertEqual(
+            result["user_request"], "Review the project and agree a report."
+        )

@@ -24,7 +24,6 @@ jobs:
           - os: macos-latest
             python: "3.14"
     env:
-      TMPDIR: ${{ runner.temp }}
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@v7
@@ -34,4 +33,6 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Test protocol and distribution
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: python -B -m unittest discover -s tests -v

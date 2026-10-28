@@ -100,6 +100,238 @@ class LiveEvalTests(unittest.TestCase):
         self.assertEqual((installed / "SKILL.md").read_text(), "Prior instructions\n")
         self.assertEqual(manifest["skill_source"], str(snapshot))
 
+    def test_mixed_models_are_selected_and_graded_in_launch_order(self) -> None:
+        from dataclasses import replace
+
+        settings = replace(
+            self.settings, peer_models=["sonnet-fixture", "haiku-fixture"]
+        )
+        manifest = LIVE.prepare(self.case, self.root / "mixed", settings)
+        peers = []
+        for index, model in enumerate(settings.peer_models):
+            args = LIVE.command(
+                self.case, manifest, settings.for_peer(index), f"session-{index}"
+            )
+            self.assertEqual(args[args.index("--model") + 1], model)
+            self.assertEqual(args[args.index("--effort") + 1], "high")
+            peers.append(
+                {
+                    "model": model,
+                    "goal_set_observed": False,
+                    "result_subtype": "success",
+                    "is_error": False,
+                    "exit_code": 0,
+                }
+            )
+        result = LIVE.grade(self.case, manifest, peers, False)
+        self.assertTrue(result["protocol_checks"]["requested_model_observed"])
+        peers[1]["model"] = peers[0]["model"]
+        result = LIVE.grade(self.case, manifest, peers, False)
+        self.assertFalse(result["protocol_checks"]["requested_model_observed"])
+
+    def test_mixed_model_settings_reject_partial_or_malformed_pairs(self) -> None:
+        path = self.root / "mixed-settings.json"
+        values = json.loads((ROOT / "evals/live/settings.json").read_text())
+        for models in ([], ["one"], ["one", ""], ["one", 2], "one,two"):
+            path.write_text(json.dumps({**values, "peer_models": models}))
+            with (
+                self.subTest(models=models),
+                self.assertRaisesRegex(ValueError, "peer_models"),
+            ):
+                LIVE.TrialSettings.load(path)
+
+    def test_agreement_first_regression_does_not_supply_detailed_done_criteria(
+        self,
+    ) -> None:
+        cases = json.loads((ROOT / "evals/live/scenarios.json").read_text())[
+            "scenarios"
+        ]
+        case = next(
+            item for item in cases if item["id"] == "agreement-first-broad-review"
+        )
+        self.assertNotIn("allow_discovery", case)
+        self.assertIn("before you proceed with work", case["prompt"])
+        self.assertIn(
+            "No detailed review-quality completion criteria", case["instructions"]
+        )
+        self.assertIn("inputs/metadata.json", case["files"])
+
+    def test_helpers_are_opt_in_and_have_a_read_only_native_allowlist(self) -> None:
+        case = {**self.case, "allow_helpers": True}
+        manifest = LIVE.prepare(case, self.root / "run", self.settings)
+        args = LIVE.command(case, manifest, self.settings, "session")
+        definitions = json.loads(args[args.index("--agents") + 1])
+        self.assertEqual(args[args.index("--agent") + 1], LIVE.EVALUATOR_NAME)
+        self.assertIn("--forward-subagent-text", args)
+        self.assertEqual(definitions[LIVE.EVALUATOR_NAME]["prompt"], "")
+        self.assertIn(
+            f"Agent({LIVE.HELPER_NAME})", definitions[LIVE.EVALUATOR_NAME]["tools"]
+        )
+        self.assertEqual(
+            definitions[LIVE.HELPER_NAME]["tools"], ["Read", "Grep", "Glob"]
+        )
+        self.assertEqual(definitions[LIVE.HELPER_NAME]["model"], self.settings.model)
+        self.assertEqual(definitions[LIVE.HELPER_NAME]["effort"], "high")
+        config = json.loads(Path(manifest["config"]).read_text())
+        self.assertNotIn("Agent", config["permissions"]["deny"])
+        self.assertNotIn("Task", config["permissions"]["deny"])
+
+    def test_nested_calls_require_complete_audit_and_known_read_only_lineage(
+        self,
+    ) -> None:
+        from dataclasses import replace
+
+        from observations import (
+            NativeCall,
+            audit_complete,
+            helper_lineage,
+            input_digest,
+        )
+
+        launcher = NativeCall(
+            "session", "launch", "Agent", {"subagent_type": LIVE.HELPER_NAME}
+        )
+        child = NativeCall(
+            "session", "read", "Read", {"file_path": "inputs/example.py"}, "launch"
+        )
+        calls = [launcher, child]
+        audits = [
+            {
+                "session_id": call.session,
+                "tool_use_id": call.id,
+                "tool": call.tool,
+                "input_digest": input_digest(call.arguments, "/workspace"),
+                "cwd": "/workspace",
+                "time_ns": 1,
+                **(
+                    {"agent_id": "reader-one", "agent_type": LIVE.HELPER_NAME}
+                    if call.parent
+                    else {}
+                ),
+            }
+            for call in calls
+        ]
+        self.assertTrue(audit_complete(calls, audits))
+        self.assertTrue(helper_lineage(calls, audits, LIVE.HELPER_NAME))
+        self.assertFalse(audit_complete(calls, audits[:1]))
+        self.assertFalse(audit_complete(calls, [*audits, audits[-1]]))
+        for changed in (
+            replace(child, parent="unknown"),
+            replace(child, session="other-peer"),
+            replace(child, parent=None),
+        ):
+            self.assertFalse(
+                helper_lineage([launcher, changed], audits, LIVE.HELPER_NAME)
+            )
+        for field, value in (("agent_type", "Explore"), ("agent_id", None)):
+            self.assertFalse(
+                helper_lineage(
+                    calls, [audits[0], {**audits[1], field: value}], LIVE.HELPER_NAME
+                )
+            )
+        for tool in ("Bash", "Write", "Agent"):
+            with self.subTest(tool=tool):
+                self.assertFalse(
+                    helper_lineage(
+                        [launcher, replace(child, tool=tool)], audits, LIVE.HELPER_NAME
+                    )
+                )
+
+    def test_helper_prompts_exclude_only_validated_peer_capabilities(self) -> None:
+        from dataclasses import replace
+
+        from observations import NativeCall, helper_credentials_isolated
+
+        workspace = self.root / "workspace"
+        script = workspace / ".claude/skills/duet/scripts/duet.py"
+        member = {"participant": "peer-a", "session": "secret-actor-token"}
+        joined = {
+            **member,
+            "dry_run": False,
+            "connection": "secret-short-handle",
+            "connection_path": str(self.root / "board/connections/peer-a.json"),
+        }
+        join = NativeCall(
+            "native-a", "join", "Bash", {"command": f"python3 -B {script} join"}
+        )
+        delegate = NativeCall(
+            "native-a", "launch", "Agent", {"prompt": "Inspect inputs/example.py"}
+        )
+        streams = [
+            [
+                {
+                    "type": "user",
+                    "session_id": "native-a",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "join",
+                                "content": json.dumps(joined),
+                            }
+                        ]
+                    },
+                }
+            ]
+        ]
+
+        def isolated(prompt: str, recorded_members: list[dict[str, str]]) -> bool:
+            """Check a helper prompt without exposing capability values in diagnostics."""
+            return helper_credentials_isolated(
+                streams,
+                [join, replace(delegate, arguments={"prompt": prompt})],
+                recorded_members,
+                script,
+                workspace,
+            )
+
+        self.assertTrue(isolated("Inspect inputs/example.py", [member]))
+        for capability in (
+            member["session"],
+            joined["connection"],
+            joined["connection_path"],
+        ):
+            self.assertFalse(
+                isolated(f"Use {capability} to inspect the task", [member])
+            )
+        # A mismatched join result is not an authoritative source of capabilities.
+        self.assertTrue(isolated(joined["connection"], []))
+
+    def test_helper_file_scope_excludes_connections_and_unscoped_searches(self) -> None:
+        from observations import NativeCall, helper_task_path
+
+        workspace = self.root / "workspace"
+        allowed = [
+            ("Read", {"file_path": "inputs/example.py"}),
+            ("Read", {"file_path": "TASK.md"}),
+            ("Read", {"file_path": "case_checks.py"}),
+            ("Grep", {"path": "inputs", "pattern": "value"}),
+            ("Glob", {"pattern": "inputs/**/*.py"}),
+            ("Glob", {"path": str(workspace / "inputs"), "pattern": "**/*.py"}),
+        ]
+        forbidden = [
+            ("Read", {"file_path": str(self.root / "board/connections/peer-a.json")}),
+            ("Read", {"file_path": "inputs/connections/peer-a.json"}),
+            ("Grep", {"path": "inputs/connections", "pattern": "token"}),
+            ("Glob", {"path": str(self.root), "pattern": "board/connections/*"}),
+            ("Glob", {"pattern": "inputs/connections/*"}),
+            ("Read", {"file_path": "inputs/../../credentials.json"}),
+            ("Grep", {"path": ".", "pattern": "token"}),
+            ("Glob", {"pattern": "**/*"}),
+        ]
+        for tool, arguments in allowed:
+            self.assertTrue(
+                helper_task_path(
+                    NativeCall("native", "call", tool, arguments, "launch"), workspace
+                )
+            )
+        for tool, arguments in forbidden:
+            self.assertFalse(
+                helper_task_path(
+                    NativeCall("native", "call", tool, arguments, "launch"), workspace
+                )
+            )
+
     def test_blocked_coordination_does_not_reward_a_solo_report(self) -> None:
         case = {
             **self.case,
@@ -217,7 +449,7 @@ class LiveEvalTests(unittest.TestCase):
             LIVE.task_tool({"tool": "Grep", "file_path": ".", "pattern": "value"})
         )
         self.assertFalse(LIVE.task_tool({"tool": "Glob", "pattern": "**/*"}))
-        self.assertTrue(LIVE.task_tool({"tool": "Glob", "pattern": "inputs/**/*.py"}))
+        self.assertFalse(LIVE.task_tool({"tool": "Glob", "pattern": "inputs/**/*.py"}))
         self.assertFalse(
             LIVE.task_tool(
                 {
@@ -247,6 +479,7 @@ class LiveEvalTests(unittest.TestCase):
         }
         self.assertTrue(audit_complete([call], [observed]))
         self.assertFalse(audit_complete([call], []))
+        self.assertFalse(audit_complete([call], [{**observed, "cwd": 42}]))
         self.assertFalse(audit_complete([call], [observed, observed]))
         self.assertFalse(
             audit_complete([call], [{**observed, "input_digest": "wrong"}])
@@ -372,6 +605,10 @@ class LiveEvalTests(unittest.TestCase):
         changed["message"]["content"][0]["input"]["file_path"] = "inputs/example.py"
         with self.assertRaisesRegex(ValueError, "changed"):
             native_calls([[row, changed]])
+        changed = {**row, "parent_tool_use_id": "helper-launch"}
+        self.assertEqual(native_calls([[changed]])[0].parent, "helper-launch")
+        with self.assertRaisesRegex(ValueError, "changed"):
+            native_calls([[row, changed]])
 
     def test_roles_come_from_valid_join_results_not_process_launch_order(self) -> None:
         from observations import NativeCall, joined_participants
@@ -419,6 +656,17 @@ class LiveEvalTests(unittest.TestCase):
         )
         wrong = [{"participant": "peer-a", "session": "impostor"}]
         self.assertEqual(joined_participants(streams, calls, wrong, script), {})
+        from dataclasses import replace
+
+        self.assertEqual(
+            joined_participants(
+                streams,
+                [replace(call, parent="helper-launch") for call in calls],
+                members,
+                script,
+            ),
+            {},
+        )
 
     def test_hook_snapshot_and_digest_are_independent_of_later_source_edits(
         self,
@@ -443,4 +691,226 @@ class LiveEvalTests(unittest.TestCase):
         self.assertNotEqual(
             input_digest(relative, "/workspace"),
             input_digest({"file_path": "inputs/other.py"}, "/workspace"),
+        )
+
+    def test_discovery_allows_only_owned_ready_reads_not_early_execution(self) -> None:
+        from timing import work_timing_checks
+
+        participants = {"native-a": "peer-a", "native-b": "peer-b"}
+        ready = {"peer-a": 10, "peer-b": 12}
+        reads = [
+            {
+                "tool": "Read",
+                "file_path": "inputs/code.py",
+                "session_id": session,
+                "time_ns": 15,
+            }
+            for session in participants
+        ]
+        checks = work_timing_checks(
+            [
+                *reads,
+                {
+                    "tool": "Glob",
+                    "file_path": "inputs",
+                    "pattern": "*",
+                    "session_id": "native-a",
+                    "time_ns": 1,
+                },
+            ],
+            20,
+            ready,
+            participants,
+            allow_discovery=True,
+            blocked=False,
+            require_discovery=True,
+        )
+        self.assertTrue(all(checks.values()))
+        self.assertFalse(
+            work_timing_checks(
+                reads, 20, ready, participants, allow_discovery=False, blocked=False
+            )["observable_task_timing_valid"]
+        )
+        for invalid in (
+            {**reads[0], "time_ns": 9},
+            {**reads[0], "tool": "Write"},
+            {
+                **reads[0],
+                "tool": "Bash",
+                "file_path": None,
+                "command": "python3 -B /workspace/case_checks.py",
+            },
+            {**reads[0], "session_id": "unknown"},
+        ):
+            self.assertFalse(
+                work_timing_checks(
+                    [*reads, invalid],
+                    20,
+                    ready,
+                    participants,
+                    allow_discovery=True,
+                    blocked=False,
+                )["observable_task_timing_valid"]
+            )
+        one = work_timing_checks(
+            reads[:1],
+            20,
+            ready,
+            participants,
+            allow_discovery=True,
+            blocked=False,
+            require_discovery=True,
+        )
+        self.assertFalse(one["both_peers_inspected_before_gate"])
+        self.assertFalse(
+            work_timing_checks(
+                reads, None, ready, participants, allow_discovery=True, blocked=True
+            )["observable_task_timing_valid"]
+        )
+
+    def test_input_inventory_includes_ignored_outputs_bytecode_and_new_directories(
+        self,
+    ) -> None:
+        inputs = self.root / "inputs"
+        inputs.mkdir()
+        (inputs / ".gitignore").write_text(".coverage\nhtmlcov/\n__pycache__/\n")
+        (inputs / ".coverage").write_text("prior state")
+        before = LIVE.input_inventory(inputs)
+        (inputs / ".coverage").write_text("replacement")
+        self.assertNotEqual(LIVE.input_inventory(inputs), before)
+        for relative in ("htmlcov/index.html", "__pycache__/sample.pyc"):
+            baseline = LIVE.input_inventory(inputs)
+            target = inputs / relative
+            target.parent.mkdir(exist_ok=True)
+            target.write_bytes(b"generated")
+            self.assertNotEqual(LIVE.input_inventory(inputs), baseline)
+        baseline = LIVE.input_inventory(inputs)
+        (inputs / "empty-generated-dir").mkdir()
+        self.assertNotEqual(LIVE.input_inventory(inputs), baseline)
+
+    def test_terminal_handoff_cannot_repeat_investigation_or_edit_approved_report(
+        self,
+    ) -> None:
+        from timing import work_stopped_at_terminal
+
+        before = {"tool": "Read", "file_path": "inputs/code.py", "time_ns": 10}
+        report = {"tool": "Read", "file_path": "output/report.md", "time_ns": 30}
+        self.assertTrue(work_stopped_at_terminal([before, report], 20))
+        for late in (
+            {**before, "time_ns": 30},
+            {**before, "file_path": "inputs/output/code.py", "time_ns": 30},
+            {**report, "tool": "Edit"},
+            {
+                "tool": "Bash",
+                "command": "python3 -B /workspace/case_checks.py",
+                "time_ns": 30,
+            },
+        ):
+            with self.subTest(late=late):
+                self.assertFalse(work_stopped_at_terminal([before, late], 20))
+
+    def test_disposable_additions_never_waive_preservation_of_existing_inputs(
+        self,
+    ) -> None:
+        baseline = {
+            ".": "directory",
+            ".coverage": "sha256:prior",
+            "code.py": "sha256:source",
+        }
+        runtime = {
+            **baseline,
+            ".review-cache": "directory",
+            ".review-cache/run/status.json": "sha256:new",
+        }
+        self.assertTrue(LIVE.input_tree_preserved(baseline, runtime, [".review-cache"]))
+        self.assertFalse(LIVE.input_tree_preserved(baseline, runtime, []))
+        for changed in (
+            {**runtime, ".coverage": "sha256:replacement"},
+            {**runtime, "code.py": "sha256:modified"},
+            {k: v for k, v in runtime.items() if k != ".coverage"},
+            {**runtime, "unexpected.py": "sha256:new"},
+        ):
+            self.assertFalse(
+                LIVE.input_tree_preserved(baseline, changed, [".review-cache"])
+            )
+        for invalid in (".", "../escape", "/absolute", ".coverage"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                LIVE.input_tree_preserved(baseline, runtime, [invalid])
+
+    def test_practical_review_fixture_creates_only_disposable_operational_files(
+        self,
+    ) -> None:
+        cases = json.loads((ROOT / "evals/live/scenarios.json").read_text())[
+            "scenarios"
+        ]
+        case = next(
+            item for item in cases if item["id"] == "practical-read-only-review"
+        )
+        manifest = LIVE.prepare(case, self.root / "practical", self.settings)
+        workspace = Path(manifest["workspace"])
+        result = subprocess.run(
+            [sys.executable, "-B", str(workspace / "case_checks.py")],
+            cwd=workspace,
+            env={**os.environ, "TMPDIR": manifest["temporary"]},
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=self.settings.wall_seconds,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        observed = json.loads(result.stdout)
+        self.assertEqual(observed["before"]["mean_1_2"], 1.5)
+        self.assertEqual(observed["after"]["mean_1_2"], 1)
+        self.assertTrue(
+            LIVE.input_tree_preserved(
+                manifest["input_tree_inventory"],
+                LIVE.input_inventory(workspace / "inputs"),
+                case["allowed_input_additions"],
+            )
+        )
+        self.assertTrue(list((workspace / "inputs/.review-cache").rglob("status.json")))
+        self.assertTrue(list(Path(manifest["temporary"]).rglob("client-state.json")))
+
+    def test_file_scope_preserves_parent_directory_breaches_as_failures(self) -> None:
+        from observations import file_tools_scoped
+
+        workspace = self.root / "workspace"
+        temporary = self.root / "temporary"
+        read = {"tool": "Read", "file_path": "inputs/code.py", "cwd": str(workspace)}
+        self.assertTrue(file_tools_scoped([read], workspace, temporary))
+        self.assertTrue(
+            file_tools_scoped(
+                [{"tool": "Glob", "pattern": "**/*", "cwd": str(workspace)}],
+                workspace,
+                temporary,
+            )
+        )
+        self.assertFalse(
+            file_tools_scoped(
+                [
+                    {
+                        "tool": "Glob",
+                        "file_path": str(self.root),
+                        "pattern": "*",
+                        "cwd": str(workspace),
+                    }
+                ],
+                workspace,
+                temporary,
+            )
+        )
+        self.assertFalse(
+            file_tools_scoped(
+                [{**read, "file_path": "../private.txt"}], workspace, temporary
+            )
+        )
+        self.assertFalse(
+            file_tools_scoped([{**read, "tool": "Write"}], workspace, temporary)
+        )
+        self.assertTrue(
+            file_tools_scoped(
+                [{**read, "tool": "Edit", "file_path": "output/report.md"}],
+                workspace,
+                temporary,
+            )
         )

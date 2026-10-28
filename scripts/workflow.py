@@ -51,7 +51,7 @@ def gate(settings: Settings, snapshot: Snapshot) -> Gate:
     initial = opening(settings, snapshot.history, snapshot.conflicts)
     require(
         initial.agreement is not None and not initial.conflicted,
-        "agree on completion criteria and a stop condition before task work",
+        "agree on completion criteria and a stop condition before main task work",
     )
     return Gate(snapshot.history[initial.agreement.reply_to], initial.agreement)
 

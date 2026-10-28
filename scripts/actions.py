@@ -18,7 +18,7 @@ from board import atomic_write, directory, publish, read_record, scan
 from delivery import acknowledge
 from enrollment import check_membership
 from locking import file_lock
-from messages import Kind, Message
+from messages import INITIATORS, Kind, Message
 from settings import (
     COMPLETION_SCOPE,
     INITIAL_PLAN_SCOPE,
@@ -177,6 +177,10 @@ def compose(
     dry_run: bool = False,
 ) -> bytes:
     """Fill mechanical fields while leaving commitments and judgments explicit."""
+    require(
+        kind not in INITIATORS or reply_to is None,
+        f"{kind.value} starts a new subject: use --cause <message-id>, not --reply-to; use agree/object --reply-to to respond to a proposal",
+    )
     settings = connection.settings
     snapshot = scan(settings)
     history = snapshot.history
@@ -208,6 +212,11 @@ def compose(
     if stop_condition is not None:
         require("stop_condition" not in payload, "stop condition supplied twice")
         payload["stop_condition"] = stop_condition
+    if kind == Kind.ALERT:
+        require(
+            bool(payload.get("scope")),
+            "alert requires --scope <affected-area> (or scope in --body); use --cause <message-id> to link the incident",
+        )
     if kind == Kind.READY:
         payload.setdefault("context_revision", settings.context_revision)
         subject_type, subject_id = "goal", settings.goal
