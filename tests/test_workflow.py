@@ -524,6 +524,75 @@ class WorkflowTests(InteractionFixture):
             find_run(self.peers[0].settings.board, self.peers[0].settings.goal).complete
         )
 
+    def test_required_post_pending_approval_cannot_close_as_report_success(
+        self,
+    ) -> None:
+        """A ready report cannot discharge an accepted publication obligation."""
+        self.plan()
+        requested = send(
+            self.peers[0],
+            Kind.REQUEST,
+            text="Post the required outcome after user approval",
+            scope=["publication"],
+            criteria=["Approved comment posted and verified"],
+        )
+        send(self.peers[1], Kind.ACCEPT, reply_to=requested["id"])
+        self.handled(0)
+        result, code = self.act(
+            0,
+            propose=True,
+            text="Report ready but mandatory publication lacks approval",
+            artifacts=[self.report],
+            evidence=["Draft is ready; post not authorized"],
+        )
+        self.assertEqual(code, ExitCode.ATTENTION)
+        self.assertEqual(result["status"], "blocked")
+        self.assertFalse(result["terminal"])
+        offered = self.offer(outcome="incomplete")
+        self.handled(1)
+        self.act(
+            1,
+            agree=offered["proposal"],
+            text="Draft reviewed; required post is still unapproved",
+        )
+        result, _ = self.act(0)
+        self.assertTrue(result["terminal"])
+        self.assertFalse(result["complete"])
+        approval = scan(self.peers[0].settings).history[result["agreement"]]
+        self.assertIn("without claiming host-goal success", approval.body["text"])
+        self.assertIn("required post is still unapproved", approval.body["text"])
+
+    def test_both_success_consents_record_exit_readiness_with_custom_comments(
+        self,
+    ) -> None:
+        """Optional comments retain the whole-goal declaration before bilateral exit."""
+        self.plan()
+        offered = self.offer()
+        proposal = scan(self.peers[0].settings).history[offered["proposal"]]
+        self.assertIn(
+            "no required action, approval or cleanup remains pending",
+            proposal.body["proposal"],
+        )
+        self.assertIn("ready to exit", proposal.body["proposal"])
+        self.assertFalse(state(self.peers[0])["terminal"])
+        self.handled(1)
+        self.act(
+            1,
+            agree=offered["proposal"],
+            text="Checked the report and all original requirements",
+        )
+        result, _ = self.act(0)
+        self.assertTrue(result["complete"])
+        approval = scan(self.peers[0].settings).history[result["agreement"]]
+        self.assertIn(
+            "no required action, approval or cleanup remains pending",
+            approval.body["text"],
+        )
+        self.assertIn("ready to exit", approval.body["text"])
+        self.assertIn(
+            "Checked the report and all original requirements", approval.body["text"]
+        )
+
     def test_gate_amendment_invalidates_old_offer_after_acknowledgment(self) -> None:
         original = self.plan()
         offered = self.offer()

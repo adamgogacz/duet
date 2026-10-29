@@ -914,3 +914,54 @@ class LiveEvalTests(unittest.TestCase):
                 temporary,
             )
         )
+
+    def test_owned_cleanup_fixture_preserves_unrelated_scratch_and_deliverables(
+        self,
+    ) -> None:
+        """Exercise real creation/removal and reject receipts that claim other ownership."""
+        cases = json.loads((ROOT / "evals/live/scenarios.json").read_text())[
+            "scenarios"
+        ]
+        case = next(
+            item
+            for item in cases
+            if item["id"] == "draft-only-review-with-owned-cleanup"
+        )
+        manifest = LIVE.prepare(case, self.root / "cleanup", self.settings)
+        workspace, temporary = Path(manifest["workspace"]), Path(manifest["temporary"])
+        unrelated = temporary / "other-session.txt"
+        unrelated.write_text("keep other work")
+        board_marker = temporary / "duet" / "retained-record.json"
+        board_marker.parent.mkdir()
+        board_marker.write_text("durable collaboration state")
+        result = subprocess.run(
+            [sys.executable, "-B", str(workspace / "case_checks.py")],
+            cwd=workspace,
+            env={**os.environ, "TMPDIR": str(temporary)},
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=self.settings.wall_seconds,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = case["scratch_cleanup_receipt"]
+        self.assertTrue(LIVE.scratch_cleanup_verified(workspace, temporary, receipt))
+        self.assertEqual(unrelated.read_text(), "keep other work")
+        self.assertEqual(board_marker.read_text(), "durable collaboration state")
+        self.assertTrue((workspace / receipt).is_file())
+        self.assertEqual(
+            LIVE.input_inventory(workspace / "inputs"), manifest["input_tree_inventory"]
+        )
+        recorded = json.loads((workspace / receipt).read_text())
+        self.assertFalse(Path(recorded["scratch_root"]).exists())
+        for replacement in (
+            {**recorded, "created": False},
+            {**recorded, "removed": False},
+            {**recorded, "scratch_root": str(temporary)},
+            {**recorded, "scratch_root": str(self.root / "not-owned")},
+            {**recorded, "scratch_root": str(unrelated)},
+        ):
+            (workspace / receipt).write_text(json.dumps(replacement))
+            self.assertFalse(
+                LIVE.scratch_cleanup_verified(workspace, temporary, receipt)
+            )

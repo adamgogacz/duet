@@ -120,7 +120,10 @@ replacement or amend the accepted gate. Competing acceptances require explicit
 reconciliation; never request redundant acceptance just to settle a crossed exchange.
 
 The opening MUST carry nonempty completion `criteria` and a `stop_condition`,
-and record scope, owners, user constraints, collaboration method, artifact location,
+covering mandatory requirements from both peers' governing instructions and host
+objectives. Pending approval does not remove a required action from scope. A draft
+cannot satisfy required publication unless the user explicitly makes the task draft-only.
+The opening also records scope, owners, user constraints, collaboration method, artifact location,
 final writer, and completion proposer. Criteria must describe a meaningful outcome
 and acceptance evidence; the stop condition bounds unsuccessful investigation or
 reassessment. A success condition alone does not guarantee termination on an
@@ -353,6 +356,11 @@ restriction. Operational files do not authorize pre-gate task work or publicatio
 Peers SHOULD check protected state and investigate unexpected changes; they MUST NOT
 invent a zero-filesystem-write requirement or treat ordinary temporary scaffolding
 alone as a breach. Actual damage and consequential uncertainty remain reportable.
+Creation and removal of known session-owned disposable scratch are ordinary task
+work under this default. Preserve pre-existing/unfamiliar files, other sessions'
+files, final deliverables, required evidence and the durable Duet board. Ownership
+is not inferred from being under TMPDIR. Complete permitted cleanup before final
+success consent; explicit retention, approval and host restrictions take precedence.
 
 ## 8. Durable memory
 
@@ -406,6 +414,14 @@ latency. Check pairing/readiness before making a peer-absence claim.
 ## 11. Whole-goal consensus and bounded stopping
 
 Personal completion and two independent done messages do not establish consensus.
+Before proposing or accepting success, each peer MUST reconcile the shared claim
+with the full objective its host would mark achieved and explicitly confirm all
+mandatory task work, actions, approvals and cleanup are satisfied and it is ready
+to exit. The completion proposal and agreement are these bilateral exit confirmations;
+no additional handshake is required. Approval of a report is not approval of an
+unfinished wider goal. A mandatory post awaiting permission keeps success pending:
+present the concrete draft and request authority once, then wait or use the agreed
+incomplete stopping condition. Peer agreement never supplies missing user authority.
 The designated proposer offers a whole-goal claim under the effective gate, with
 one evidence statement per criterion and exact final artifact revisions. The peer
 reviews and explicitly agrees or requests changes. No user criterion is waived

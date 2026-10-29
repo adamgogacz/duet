@@ -81,6 +81,12 @@ agreement, not whether a criterion expresses the user's goal well. Preserve user
 criteria; derive faithful bounded criteria when the user supplies a broad goal.
 No user prompt boilerplate or separate gate-handshake phase is required.
 
+The gate must cover mandatory requirements from both peers' governing instructions
+and the objective each host is pursuing. An approval boundary does not remove an
+action from that objective: if posting is required but approval is pending, a draft
+is not successful completion. Resolve differing interpretations before assent;
+only an authoritative user instruction can narrow the task to review/draft handoff.
+
 User ordering takes precedence over the discovery default. “Agree before work”
 requires a gate before task metadata or content inspection, even when the quality
 criteria are broad. Reading governing instructions and coordination metadata is
@@ -148,6 +154,13 @@ does not prohibit operational scratch elsewhere; an explicit output-only restric
 does. This allowance changes neither gate ordering nor publication authority.
 During startup/discovery it permits operational files, not premature task deliverables
 or execution of project code.
+
+Creating and removing session-owned disposable scratch is ordinary task work under
+this default. Tests may clean up only scratch they created. Ownership must be known,
+not inferred merely from a path being under TMPDIR. Preserve pre-existing/unfamiliar
+files, other sessions' files, final reports, required evidence and the durable board.
+Do permitted cleanup before proposing successful completion; explicit retention,
+approval or host restrictions override the default. Do not use broad deletion globs.
 
 After the gate, inspect effective tool/project configuration before execution.
 Account for implicit reports, caches, generated files and subprocesses. Use permitted
@@ -233,6 +246,20 @@ Changed bytes require fresh review. After terminal completion, the captured copy
 is the approved deliverable; future origin edits do not approve new bytes.
 
 ### Propose, correct, and close
+
+Before either consent, compare the shared completion claim with the full objective
+your host would mark achieved. Explicitly confirm all required work and permitted
+cleanup are finished, no mandatory approval/action is pending, and you are ready to
+exit successfully. The proposer includes that judgment in its `--text`; the reviewer
+makes the same judgment with `--agree`. There is no additional exit handshake.
+The helper records explicit exit readiness in both messages, preserving any supplied
+comment. These are agent assertions: the utility cannot inspect a host goal or prove
+that prose covers every requirement. Do not invoke successful consent unless true.
+Ordinary report review can use `send` without whole-goal completion if required work
+remains. For mandatory publication awaiting authority, present the concrete draft
+and approval request once; do authorized work or bounded waiting until resolution.
+At the agreed unsuccessful stop bound, use incomplete, not success. A user-requested
+draft-only task may complete with publication excluded by that explicit request.
 
 Only the completion proposer:
 

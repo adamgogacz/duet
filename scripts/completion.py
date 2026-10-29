@@ -169,7 +169,7 @@ def state(connection: Connection) -> dict[str, Any]:
             "next_actions": ["wait for the peer or use complete --revise"]
             if connection.participant == settings.completion_proposer
             else [
-                "review the captured revision and explicitly agree or request changes"
+                "review captured bytes and all host-goal requirements; agree only when ready to exit, otherwise request changes"
             ],
         }
     return {
@@ -179,6 +179,26 @@ def state(connection: Connection) -> dict[str, Any]:
             "continue complete; closing acknowledgments remain provisional"
         ],
     }
+
+
+def _exit_statement(outcome: str, text: str | None, *, agreeing: bool = False) -> str:
+    """Record explicit exit readiness without pretending to inspect the host's goal."""
+    action = "I explicitly agree to" if agreeing else "I propose"
+    if outcome == "complete":
+        statement = (
+            f"{action} successful whole-goal completion at these exact revisions. "
+            "All mandatory task work is satisfied, including my host-goal requirements; "
+            "no required action, approval or cleanup remains pending. "
+            "I am ready to exit after bilateral closing."
+        )
+    else:
+        stop = "stop" if agreeing else "stopping"
+        statement = (
+            f"{action} {stop} this collaboration incomplete; unmet requirements remain unmet. "
+            "I am ready to hand off this outcome after bilateral closing, "
+            "without claiming host-goal success."
+        )
+    return f"{statement}\n\n{text}" if text else statement
 
 
 def complete(
@@ -337,7 +357,7 @@ def complete(
         sent = send(
             connection,
             Kind.PROPOSE,
-            text=text,
+            text=_exit_statement(outcome, text),
             scope=COMPLETION_SCOPE,
             artifacts=artifacts,
             evidence=evidence,
@@ -365,12 +385,7 @@ def complete(
             connection,
             Kind.AGREE,
             reply_to=agree,
-            text=text
-            or (
-                "I explicitly agree the whole goal meets the current gate at these exact revisions."
-                if offer.body["outcome"] == "complete"
-                else "I explicitly agree to stop incomplete; unmet criteria remain unmet."
-            ),
+            text=_exit_statement(offer.body["outcome"], text, agreeing=True),
             dry_run=dry_run,
         )
     if dry_run:

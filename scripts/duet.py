@@ -126,7 +126,11 @@ def parser() -> argparse.ArgumentParser:
     )
     closing.add_argument("--connection", required=True)
     choice = closing.add_mutually_exclusive_group()
-    choice.add_argument("--propose", action="store_true")
+    choice.add_argument(
+        "--propose",
+        action="store_true",
+        help="Propose whole-goal completion or an incomplete handoff and confirm exit readiness",
+    )
     choice.add_argument(
         "--revise",
         action="store_true",
@@ -140,7 +144,7 @@ def parser() -> argparse.ArgumentParser:
     choice.add_argument(
         "--agree",
         metavar="PROPOSAL_ID",
-        help="Explicitly agree the whole shared goal is complete at this offer's revisions",
+        help="Explicitly confirm this outcome and readiness to exit, not merely report approval",
     )
     closing.add_argument(
         "--text", help="Completion evidence or agreement comment; - reads stdin"

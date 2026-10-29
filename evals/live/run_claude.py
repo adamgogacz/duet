@@ -217,6 +217,36 @@ def input_tree_preserved(
     )
 
 
+def scratch_cleanup_verified(workspace: Path, temporary: Path, receipt: str) -> bool:
+    """Check the known fixture's receipt and removed private scratch endpoint."""
+    relative = Path(receipt)
+    if (
+        relative.is_absolute()
+        or ".." in relative.parts
+        or not relative.parts
+        or relative.parts[0] != "output"
+    ):
+        return False
+    try:
+        data = json.loads((workspace / relative).read_text())
+        if not isinstance(data, dict) or not isinstance(data.get("scratch_root"), str):
+            return False
+        scratch = Path(data["scratch_root"])
+        return (
+            data.get("created") is True
+            and data.get("removed") is True
+            and scratch.is_absolute()
+            and scratch != temporary
+            and scratch.is_relative_to(temporary)
+            and scratch.resolve().is_relative_to(temporary.resolve())
+            and ".." not in scratch.parts
+            and not scratch.exists()
+            and not scratch.is_symlink()
+        )
+    except (OSError, ValueError, TypeError):
+        return False
+
+
 def prepare(
     case: dict[str, Any],
     run: Path,
@@ -665,6 +695,12 @@ def grade(
             (workspace / "inputs" / name).is_dir()
             and any((workspace / "inputs" / name).rglob("*.json"))
             for name in case["allowed_input_additions"]
+        )
+    if case.get("scratch_cleanup_receipt"):
+        checks["owned_scratch_cleanup_observed"] = bool(
+            case.get("require_project_execution")
+        ) and scratch_cleanup_verified(
+            workspace, Path(manifest["temporary"]), case["scratch_cleanup_receipt"]
         )
     if case.get("allow_helpers"):
         helper_calls = [call for call in calls if call.parent is not None]

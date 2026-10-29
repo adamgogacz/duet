@@ -190,6 +190,11 @@ Two individual “done” statements never constitute consensus. If required cri
 cannot be met, peers may agree an explicitly incomplete outcome; reaching a work
 limit never turns failure into success.
 
+Before closing successfully, both peers explicitly confirm the whole task is done
+and they are ready to exit. Required publication or approval cannot be silently
+replaced by a draft; a draft-only task must be explicitly scoped that way. The same
+completion exchange provides this confirmation, without another handshake.
+
 ## 💾 Storage and limits
 
 **Read-only reviews allow normal temporary activity.** Duet protects project
@@ -198,6 +203,9 @@ scratch files, CLI state and disposable caches are permitted; prefer storage out
 the checkout. Necessary new temporary tooling files inside it are allowed without
 overwriting existing files or changing project content. Explicit stricter instructions
 and host permissions still apply.
+Agents may create and remove their own disposable scratch within those permissions.
+They preserve existing/unfamiliar files, other sessions' work, final deliverables
+and the durable collaboration record.
 
 The first advertiser uses an existing `$TMPDIR`, otherwise Python's
 `tempfile.gettempdir()`. Its invitation records an absolute board path, which the

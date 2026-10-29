@@ -37,6 +37,10 @@ creates new disposable runtime files is eligible to run after gate agreement.
 Honor host restrictions, but do not add no-new-files or no-checkout-writes gates
 on the user's behalf. Ordinary temporary activity alone is not a breach; check
 protected state rather than requiring proof of zero filesystem writes.
+Creating and removing your own disposable scratch is normal task work. Remove
+only files/directories you created for this session; preserve existing or unfamiliar
+files, other sessions' work, final deliverables, evidence and the Duet board.
+Explicit retention, approval and host restrictions still apply.
 
 ## Define done, then work
 
@@ -61,6 +65,9 @@ Include scope, owners, constraints/capabilities, method, output, final writer an
 proposer. Each peer compares its own assessment; agree or counterpropose.
 Proposing commits you; peer assent establishes the gate before main work. Criteria
 must describe a meaningful outcome, not merely defer deciding what done means.
+Reconcile requirements from both peers' governing instructions and host goals.
+Required publication, approval or cleanup cannot be omitted merely because it is
+pending. A draft satisfies a draft-only request, not a mandatory posting requirement.
 
 Changes need fresh bilateral assent. Receive replies and inspect `status --connection`
 `gate_review` before replacing terms. The initial proposer consolidates; either peer may
@@ -110,6 +117,14 @@ may conclude with uncertainty, while required proofs or implementations remain u
 Only the completion proposer uses `complete --propose` with a whole-goal claim, exact
 final artifacts, and one `--evidence` statement per criterion. Distinguish deliverable
 completion, constraint compliance and unresolved uncertainty in that evidence.
+First finish permitted cleanup and compare the shared claim with your own host goal.
+Both peers must explicitly confirm: all mandatory work is satisfied, no required
+approval/action remains pending, and I am ready to exit successfully. The proposer
+states this in its claim; the peer confirms through `complete --agree`. These are
+the existing bilateral exit confirmations, not an extra handshake or personal done flags.
+Report approval alone is insufficient. If a required post awaits user approval,
+present the concrete draft once and keep success pending; at the agreed stop bound,
+jointly close incomplete instead. Never publish without authority or silently waive it.
 
 The peer reviews captured bytes and uses `complete --agree <offer>` or
 `complete --request-changes <offer> --text ...`. The proposer uses `complete --revise`.
